@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #0f1218; color: white; font-family: sans-serif; margin: 0; padding: 15px; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: #2c323a; border-radius: 8px; margin: 20px 0; }
+        .cell { aspect-ratio: 1; background: #1a1f26; border-radius: 2px; }
+        .winner-cell { background: #ff9500 !important; box-shadow: 0 0 10px #ff9500; }
+        .btn { background: #007aff; border: none; color: white; padding: 15px 30px; border-radius: 12px; font-weight: bold; width: 100%; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="balance">Баланс: <span id="bal-val">0</span> TON</div>
+    <div class="grid" id="grid"></div>
+    <div id="timer">Ожидание игроков...</div>
+    <input type="number" id="bet" value="1" style="width: 80%; margin: 15px; padding: 10px;">
+    <button class="btn" onclick="placeBet()">ПОСТАВИТЬ</button>
+
+    <div id="overlay">
+        <h2 style="color: gold;">ПОБЕДИТЕЛЬ!</h2>
+        <h1 id="win-name"></h1>
+        <h2 id="win-prize" style="color: #4cd964;"></h2>
+        <button class="btn" onclick="document.getElementById('overlay').style.display='none'">OK</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const uid = tg.initDataUnsafe?.user?.id || "test_user";
+        const uname = tg.initDataUnsafe?.user?.username || "Gamer";
+
+        // Рисуем сетку
+        const g = document.getElementById('grid');
+        for(let i=0; i<100; i++) g.innerHTML += `<div class="cell" id="c${i}"></div>`;
+
+        async function sync() {
+            const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+            const d = await r.json();
+            document.getElementById('bal-val').innerText = d.user.bal.toFixed(2);
+            
+            if(d.game.is_active) {
+                document.getElementById('timer').innerText = `Метеорит через: ${d.game.timer}с`;
+            }
+
+            if(d.game.result) {
+                const res = d.game.result;
+                document.getElementById('win-name').innerText = "@" + res.username;
+                document.getElementById('win-prize').innerText = "+" + res.prize + " TON";
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById(`c${res.cell}`).classList.add('winner-cell');
+            }
+        }
+
+        function placeBet() {
+            const amount = document.getElementById('bet').value;
+            fetch('/api/place_bet', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({uid, amount})
+            }).then(() => sync());
+        }
+
+        setInterval(sync, 1000);
+        sync();
+    </script>
+</body>
+</html>
