@@ -5,62 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0f1218; color: white; font-family: sans-serif; margin: 0; padding: 15px; text-align: center; }
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: #2c323a; border-radius: 8px; margin: 20px 0; }
-        .cell { aspect-ratio: 1; background: #1a1f26; border-radius: 2px; }
-        .winner-cell { background: #ff9500 !important; box-shadow: 0 0 10px #ff9500; }
-        .btn { background: #007aff; border: none; color: white; padding: 15px 30px; border-radius: 12px; font-weight: bold; width: 100%; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        body { background: #0f1218; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; overflow: hidden; }
+        .stats-header { display: flex; justify-content: space-between; align-items: center; background: #1a1f26; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #2c323a; }
+        #bal-val { color: #00d1ff; font-weight: bold; }
+        
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; background: #2c323a; border-radius: 8px; padding: 5px; margin: 15px 0; }
+        .cell { aspect-ratio: 1; background: #141921; border-radius: 3px; transition: 0.3s; }
+        .cell.active { background: #007aff; box-shadow: inset 0 0 5px #007aff; }
+        
+        /* Анимация победы */
+        @keyframes explode {
+            0% { transform: scale(1); background: #fff; }
+            50% { transform: scale(1.5); background: #ff9500; box-shadow: 0 0 20px #ff9500; }
+            100% { transform: scale(1); background: #ff9500; }
+        }
+        .winner-cell { animation: explode 0.8s ease-out forwards; z-index: 10; }
+        
+        .players-list { background: #1a1f26; border-radius: 12px; padding: 10px; height: 80px; overflow-y: auto; font-size: 14px; text-align: left; border: 1px solid #2c323a; }
+        .player-item { display: flex; justify-content: space-between; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #252b33; }
+
+        .controls { margin-top: 15px; }
+        input { background: #1a1f26; border: 1px solid #2c323a; color: white; width: 60%; padding: 12px; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
+        .btn { background: linear-gradient(180deg, #0088cc 0%, #0071a9 100%); border: none; color: white; padding: 15px; border-radius: 12px; font-weight: bold; width: 100%; box-shadow: 0 4px 15px rgba(0,136,204,0.3); }
+        
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(5px); }
     </style>
 </head>
 <body>
-    <div id="balance">Баланс: <span id="bal-val">0</span> TON</div>
+    <div class="stats-header">
+        <div>💰 <span id="bal-val">0</span> TON</div>
+        <div id="timer" style="color: #ff3b30;">Ждем игроков...</div>
+    </div>
+
     <div class="grid" id="grid"></div>
-    <div id="timer">Ожидание игроков...</div>
-    <input type="number" id="bet" value="1" style="width: 80%; margin: 15px; padding: 10px;">
-    <button class="btn" onclick="placeBet()">ПОСТАВИТЬ</button>
+
+    <div class="players-list" id="players-list">
+        <div style="color: #8e8e93; text-align: center;">Ставок пока нет...</div>
+    </div>
+
+    <div class="controls">
+        <input type="number" id="bet" value="1" min="0.1" step="0.1">
+        <button class="btn" onclick="placeBet()">ВСТУПИТЬ В БОЙ</button>
+    </div>
 
     <div id="overlay">
-        <h2 style="color: gold;">ПОБЕДИТЕЛЬ!</h2>
-        <h1 id="win-name"></h1>
-        <h2 id="win-prize" style="color: #4cd964;"></h2>
-        <button class="btn" onclick="document.getElementById('overlay').style.display='none'">OK</button>
+        <h3 style="color: #8e8e93; margin-bottom: 5px;">РАУНД ОКОНЧЕН</h3>
+        <h1 id="win-name" style="margin: 0; color: #fff;"></h1>
+        <h2 id="win-prize" style="color: #4cd964; margin: 10px 0;"></h2>
+        <button class="btn" style="width: 50%;" onclick="closeOverlay()">ОТЛИЧНО</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
+        tg.expand();
         const uid = tg.initDataUnsafe?.user?.id || "test_user";
         const uname = tg.initDataUnsafe?.user?.username || "Gamer";
 
-        // Рисуем сетку
-        const g = document.getElementById('grid');
-        for(let i=0; i<100; i++) g.innerHTML += `<div class="cell" id="c${i}"></div>`;
+        const grid = document.getElementById('grid');
+        for(let i=0; i<100; i++) grid.innerHTML += `<div class="cell" id="c${i}"></div>`;
 
         async function sync() {
-            const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
-            const d = await r.json();
-            document.getElementById('bal-val').innerText = d.user.bal.toFixed(2);
-            
-            if(d.game.is_active) {
-                document.getElementById('timer').innerText = `Метеорит через: ${d.game.timer}с`;
-            }
+            try {
+                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+                const d = await r.json();
+                
+                document.getElementById('bal-val').innerText = d.user.bal.toFixed(2);
+                
+                // Таймер и статус
+                if(d.game.is_active) {
+                    document.getElementById('timer').innerText = `🔥 ${d.game.timer}s`;
+                } else {
+                    document.getElementById('timer').innerText = "Ожидание...";
+                }
 
-            if(d.game.result) {
-                const res = d.game.result;
-                document.getElementById('win-name').innerText = "@" + res.username;
-                document.getElementById('win-prize').innerText = "+" + res.prize + " TON";
-                document.getElementById('overlay').style.display = 'flex';
-                document.getElementById(`c${res.cell}`).classList.add('winner-cell');
-            }
+                // Список игроков
+                const pList = document.getElementById('players-list');
+                const players = Object.entries(d.game.players);
+                if(players.length > 0) {
+                    pList.innerHTML = players.map(([id, amount]) => `
+                        <div class="player-item">
+                            <span>👤 ${id == uid ? "Вы" : "Игрок"}</span>
+                            <span style="color: #4cd964;">${amount} TON</span>
+                        </div>
+                    `).join('');
+                    
+                    // Подсвечиваем случайные клетки для вида активности
+                    players.forEach((p, index) => {
+                        document.getElementById(`c${(index * 7) % 100}`).classList.add('active');
+                    });
+                }
+
+                // Результат
+                if(d.game.result && document.getElementById('overlay').style.display !== 'flex') {
+                    const res = d.game.result;
+                    document.getElementById('win-name').innerText = "@" + res.username;
+                    document.getElementById('win-prize').innerText = "+" + res.prize + " TON";
+                    document.getElementById('overlay').style.display = 'flex';
+                    
+                    const cell = document.getElementById(`c${res.cell}`);
+                    cell.classList.add('winner-cell');
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (e) { console.error("Sync error"); }
         }
 
         function placeBet() {
-            const amount = document.getElementById('bet').value;
+            const amount = parseFloat(document.getElementById('bet').value);
             fetch('/api/place_bet', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({uid, amount})
-            }).then(() => sync());
+            });
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function closeOverlay() {
+            document.getElementById('overlay').style.display = 'none';
+            // Очистка сетки
+            document.querySelectorAll('.cell').forEach(c => {
+                c.classList.remove('winner-cell', 'active');
+            });
         }
 
         setInterval(sync, 1000);
