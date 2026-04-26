@@ -5,110 +5,247 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0f1218; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; overflow: hidden; }
-        .stats-header { display: flex; justify-content: space-between; align-items: center; background: #1a1f26; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #2c323a; }
-        #bal-val { color: #00d1ff; font-weight: bold; }
+        :root { --bg: #0f1218; --panel: #1a1f26; --border: #2c323a; --text: #fff; --sub: #8e8e93; --accent: #007aff; --win: #4cd964; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; }
         
-        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; background: #2c323a; border-radius: 8px; padding: 5px; margin: 15px 0; }
-        .cell { aspect-ratio: 1; background: #141921; border-radius: 3px; transition: 0.3s; }
-        .cell.active { background: #007aff; box-shadow: inset 0 0 5px #007aff; }
-        
-        /* Анимация победы */
-        @keyframes explode {
-            0% { transform: scale(1); background: #fff; }
-            50% { transform: scale(1.5); background: #ff9500; box-shadow: 0 0 20px #ff9500; }
-            100% { transform: scale(1); background: #ff9500; }
-        }
-        .winner-cell { animation: explode 0.8s ease-out forwards; z-index: 10; }
-        
-        .players-list { background: #1a1f26; border-radius: 12px; padding: 10px; height: 80px; overflow-y: auto; font-size: 14px; text-align: left; border: 1px solid #2c323a; }
-        .player-item { display: flex; justify-content: space-between; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #252b33; }
+        /* Главные контейнеры */
+        #app { display: flex; flex-direction: column; height: 100vh; }
+        .view { display: none; flex-direction: column; flex: 1; padding: 10px; overflow-y: auto; }
+        .view.active { display: flex; }
 
-        .controls { margin-top: 15px; }
-        input { background: #1a1f26; border: 1px solid #2c323a; color: white; width: 60%; padding: 12px; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
-        .btn { background: linear-gradient(180deg, #0088cc 0%, #0071a9 100%); border: none; color: white; padding: 15px; border-radius: 12px; font-weight: bold; width: 100%; box-shadow: 0 4px 15px rgba(0,136,204,0.3); }
+        /* Верхняя панель (Последняя игра) */
+        .last-win-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin-bottom: 10px; }
+        .lw-user { display: flex; align-items: center; gap: 5px; }
+        .avatar-placeholder { width: 24px; height: 24px; background: #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;}
+        .lw-info { text-align: right; }
+        .lw-prize { color: var(--win); font-weight: bold; }
+
+        /* Игровое поле (уменьшенное) */
+        .grid-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: var(--border); border-radius: 6px; padding: 3px; width: 85vw; height: 85vw; max-width: 300px; max-height: 300px; transition: 0.5s; }
+        .cell { aspect-ratio: 1; background: #141921; border-radius: 2px; transition: background 0.3s; }
         
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(5px); }
+        @keyframes explode { 0% { transform: scale(1); background: #fff; } 50% { transform: scale(1.3); background: #ff9500; box-shadow: 0 0 15px #ff9500; } 100% { transform: scale(1); background: #ff9500; } }
+        .winner-cell { animation: explode 0.8s ease-out forwards; z-index: 10; }
+
+        /* Управление ставками */
+        .controls { background: var(--panel); border-top: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; gap: 10px; border-radius: 12px 12px 0 0; }
+        #timer-bar { text-align: center; color: #ff3b30; font-weight: bold; }
+        .bet-input-group { display: flex; gap: 10px; }
+        input { background: #141921; border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 8px; font-size: 16px; flex: 1; }
+        .btn-bet { background: linear-gradient(180deg, #0088cc 0%, #0071a9 100%); border: none; color: #fff; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 16px; width: 100%; box-shadow: 0 2px 10px rgba(0,136,204,0.3); }
+
+        /* Профиль */
+        .profile-header { background: var(--panel); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid var(--border); margin-bottom: 15px; }
+        .profile-avatar { width: 80px; height: 80px; border-radius: 50%; background: #444; margin: 0 auto 10px; border: 3px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 40px;}
+        .profile-balance { background: rgba(0,209,255,0.1); border: 1px solid #00d1ff; color: #00d1ff; padding: 10px; border-radius: 8px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;}
+        
+        .ref-panel { background: var(--panel); border-radius: 12px; padding: 15px; border: 1px solid var(--border); font-size: 14px;}
+        .ref-link { color: var(--accent); word-break: break-all; margin: 10px 0; display: block;}
+        .promo-group { display: flex; gap: 5px; margin-top: 15px;}
+
+        /* Нижнее меню */
+        .nav { background: var(--panel); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(10px + var(--tg-safe-area-inset-bottom));}
+        .nav-item { color: var(--sub); text-align: center; text-decoration: none; font-size: 12px; flex: 1; opacity: 0.6; transition: 0.3s;}
+        .nav-item.active { color: var(--accent); opacity: 1; font-weight: bold; }
+        .nav-icon { font-size: 24px; display: block; margin-bottom: 2px; }
+
+        /* Всплывающее окно победителя */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(5px); }
+        .close-overlay { position: absolute; top: 20px; right: 20px; font-size: 30px; color: var(--sub); background: none; border: none; cursor: pointer;}
     </style>
 </head>
 <body>
-    <div class="stats-header">
-        <div>💰 <span id="bal-val">0</span> TON</div>
-        <div id="timer" style="color: #ff3b30;">Ждем игроков...</div>
-    </div>
+    <div id="app">
+        
+        <div style="padding: 10px 10px 0;">
+            <div class="last-win-panel" id="last-win-panel" style="display:none;">
+                <div class="lw-user">
+                    <div class="avatar-placeholder" id="lw-avatar">?</div>
+                    <div>
+                        <span id="lw-name">Wait</span><br>
+                        <span id="lw-time" style="color:var(--sub);">00:00</span>
+                    </div>
+                </div>
+                <div class="lw-info">
+                    <span class="lw-prize" id="lw-prize">+0 TON</span><br>
+                    <span style="color:var(--sub);">шанс <span id="lw-chance">0</span>%</span>
+                </div>
+            </div>
+        </div>
 
-    <div class="grid" id="grid"></div>
+        <div id="view-pvp" class="view active">
+            <div id="timer-bar">Ожидание...</div>
+            <div class="grid-container">
+                <div class="grid" id="grid"></div>
+            </div>
+            <div class="controls">
+                <div class="bet-input-group">
+                    <input type="number" id="bet" value="1" min="0.1" step="0.1">
+                    <div style="display:flex; align-items:center;">TON</div>
+                </div>
+                <button class="btn-bet" onclick="placeBet()">ВСТУПИТЬ В БОЙ</button>
+            </div>
+        </div>
 
-    <div class="players-list" id="players-list">
-        <div style="color: #8e8e93; text-align: center;">Ставок пока нет...</div>
-    </div>
+        <div id="view-profile" class="view">
+            <div class="profile-header">
+                <div class="profile-avatar" id="p-avatar">?</div>
+                <div id="p-name">Loading</div>
+                <div id="p-username" style="color:var(--sub); margin-bottom:5px;">@user</div>
+                <div class="profile-balance">
+                    <img src="https://cryptologos.cc/logos/toncoin-ton-logo.png?v=032" width="20">
+                    <span id="p-bal-val">0.00</span>
+                </div>
+            </div>
 
-    <div class="controls">
-        <input type="number" id="bet" value="1" min="0.1" step="0.1">
-        <button class="btn" onclick="placeBet()">ВСТУПИТЬ В БОЙ</button>
+            <div class="ref-panel">
+                <h3>💎 Реферальная программа</h3>
+                <p style="color:var(--sub);">Получай 10% от комиссии проекта со ставок твоих друзей!</p>
+                Приглашено: <b id="ref-count">0</b><br>
+                Заработано: <b id="ref-earned" style="color:var(--win);">0.00 TON</b>
+                <span class="ref-link" id="ref-link">loading link...</span>
+                <button class="btn-bet" style="padding:10px; font-size:14px;" onclick="copyRef()">Копировать ссылку</button>
+                
+                <div class="promo-group">
+                    <input type="text" id="promo-input" placeholder="Промокод">
+                    <button class="btn-bet" style="width:auto; padding:12px;" onclick="usePromo()">ОК</button>
+                </div>
+            </div>
+        </div>
+
+        <nav class="nav">
+            <a href="#" class="nav-item active" onclick="switchView('pvp')" id="nav-pvp">
+                <span class="nav-icon">⚔️</span>PvP
+            </a>
+            <a href="#" class="nav-item" onclick="switchView('profile')" id="nav-profile">
+                <span class="nav-icon">👤</span>Профиль
+            </a>
+        </nav>
     </div>
 
     <div id="overlay">
-        <h3 style="color: #8e8e93; margin-bottom: 5px;">РАУНД ОКОНЧЕН</h3>
-        <h1 id="win-name" style="margin: 0; color: #fff;"></h1>
-        <h2 id="win-prize" style="color: #4cd964; margin: 10px 0;"></h2>
-        <button class="btn" style="width: 50%;" onclick="closeOverlay()">ОТЛИЧНО</button>
+        <button class="close-overlay" onclick="closeOverlay()">×</button>
+        <h3 style="color: var(--sub); margin-bottom: 5px;">РАУНД ОКОНЧЕН</h3>
+        <h1 id="win-name-overlay" style="margin: 0; color: #fff; font-size:40px;"></h1>
+        <h2 id="win-prize-overlay" style="color: var(--win); margin: 15px 0; font-size:32px;"></h2>
+        <span style="color: var(--sub);">Шанс: <span id="win-chance-overlay">0</span>%</span>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const uid = tg.initDataUnsafe?.user?.id || "test_user";
-        const uname = tg.initDataUnsafe?.user?.username || "Gamer";
+        tg.ready();
 
+        // Данные из URL (реферал)
+        const urlParams = new URLSearchParams(window.location.search);
+        const referredBy = urlParams.get('startapp'); // Replit API будет ожидать этот параметр
+
+        const uid = tg.initDataUnsafe?.user?.id || "test_user";
+        const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
+        const uusername = tg.initDataUnsafe?.user?.username || "user";
+        const uphoto = tg.initDataUnsafe?.user?.photo_url;
+
+        let currentView = 'pvp';
+        let replitUrl = ''; // Будет получено от API
+
+        // Инициализация сетки
         const grid = document.getElementById('grid');
         for(let i=0; i<100; i++) grid.innerHTML += `<div class="cell" id="c${i}"></div>`;
 
+        // Синхронизация данных
         async function sync() {
             try {
-                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}&referred_by=${referredBy || ''}`);
                 const d = await r.json();
                 
-                document.getElementById('bal-val').innerText = d.user.bal.toFixed(2);
-                
-                // Таймер и статус
-                if(d.game.is_active) {
-                    document.getElementById('timer').innerText = `🔥 ${d.game.timer}s`;
-                } else {
-                    document.getElementById('timer').innerText = "Ожидание...";
+                replitUrl = d.replit_url;
+
+                // Обновление Профиля
+                if(currentView === 'profile') {
+                    document.getElementById('p-bal-val').innerText = d.user.bal.toFixed(2);
+                    document.getElementById('p-name').innerText = uname;
+                    document.getElementById('p-username').innerText = "@" + uusername;
+                    document.getElementById('ref-count').innerText = d.user.ref_count;
+                    document.getElementById('ref-earned').innerText = d.user.ref_earned.toFixed(2) + " TON";
+                    document.getElementById('ref-link').innerText = `${d.replit_url}?startapp=${uid}`; // Ссылка + ID
+                    
+                    if(uphoto) {
+                        document.getElementById('p-avatar').innerHTML = `<img src="${uphoto}" style="width:100%; height:100%; border-radius:50%;">`;
+                    } else {
+                        document.getElementById('p-avatar').innerText = uname[0];
+                    }
                 }
 
-                // Список игроков
-                const pList = document.getElementById('players-list');
-                const players = Object.entries(d.game.players);
-                if(players.length > 0) {
-                    pList.innerHTML = players.map(([id, amount]) => `
-                        <div class="player-item">
-                            <span>👤 ${id == uid ? "Вы" : "Игрок"}</span>
-                            <span style="color: #4cd964;">${amount} TON</span>
-                        </div>
-                    `).join('');
-                    
-                    // Подсвечиваем случайные клетки для вида активности
-                    players.forEach((p, index) => {
-                        document.getElementById(`c${(index * 7) % 100}`).classList.add('active');
-                    });
+                // Верхняя панель (История)
+                const lwPanel = document.getElementById('last-win-panel');
+                if(d.last_win) {
+                    lwPanel.style.display = 'flex';
+                    document.getElementById('lw-name').innerText = d.last_win.username;
+                    document.getElementById('lw-time').innerText = d.last_win.time;
+                    document.getElementById('lw-prize').innerText = "+" + d.last_win.prize + " TON";
+                    document.getElementById('lw-chance').innerText = d.last_win.chance;
+                    document.getElementById('lw-avatar').innerText = d.last_win.username[0];
                 }
 
-                // Результат
-                if(d.game.result && document.getElementById('overlay').style.display !== 'flex') {
-                    const res = d.game.result;
-                    document.getElementById('win-name').innerText = "@" + res.username;
-                    document.getElementById('win-prize').innerText = "+" + res.prize + " TON";
-                    document.getElementById('overlay').style.display = 'flex';
-                    
-                    const cell = document.getElementById(`c${res.cell}`);
-                    cell.classList.add('winner-cell');
-                    tg.HapticFeedback.notificationOccurred('success');
+                // PvP логика
+                if(currentView === 'pvp') {
+                    // Таймер
+                    if(d.game.is_active) {
+                        document.getElementById('timer-bar').innerText = `🔥 Метеорит через: ${d.game.timer}с`;
+                    } else {
+                        document.getElementById('timer-bar').innerText = "Ожидание игроков...";
+                    }
+
+                    // --- ЦВЕТОВАЯ ВИЗУАЛИЗАЦИЯ ПОЛЯ ---
+                    if(Object.keys(d.game.players).length > 0) {
+                        const players = Object.entries(d.game.players);
+                        const totalBank = players.reduce((sum, p) => sum + p[1], 0);
+                        
+                        let currentCellIndex = 0;
+                        players.forEach(([pid, amount]) => {
+                            const chancePercent = (amount / totalBank) * 100;
+                            const cellsCount = Math.round(chancePercent); // Сколько клеток закрасить
+                            const color = d.game.colors[pid];
+                            
+                            for(let i=0; i < cellsCount && currentCellIndex < 100; i++) {
+                                document.getElementById(`c${currentCellIndex}`).style.background = color;
+                                currentCellIndex++;
+                            }
+                        });
+                        // Оставшиеся клетки докрашиваем цветом последнего игрока (округление)
+                        while(currentCellIndex < 100) {
+                             const lastColor = d.game.colors[players[players.length-1][0]];
+                             document.getElementById(`c${currentCellIndex}`).style.background = lastColor;
+                             currentCellIndex++;
+                        }
+                    } else {
+                        // Чистое поле, если нет ставок
+                        document.querySelectorAll('.cell').forEach(c => c.style.background = '#141921');
+                    }
+
+                    // Результат раунда
+                    if(d.game.result && document.getElementById('overlay').style.display !== 'flex') {
+                        const res = d.game.result;
+                        document.getElementById('win-name-overlay').innerText = "@" + res.username;
+                        document.getElementById('win-prize-overlay').innerText = "+" + res.prize + " TON";
+                        document.getElementById('win-chance-overlay').innerText = res.chance;
+                        document.getElementById('overlay').style.display = 'flex';
+                        
+                        // Анимация "взрыва"
+                        const cell = document.getElementById(`c${res.cell}`);
+                        cell.classList.add('winner-cell');
+                        tg.HapticFeedback.notificationOccurred('success');
+                        
+                        // Автоматическое закрытие через 5 сек (как в коде main.py)
+                        setTimeout(closeOverlay, 5000);
+                    }
                 }
+
             } catch (e) { console.error("Sync error"); }
         }
 
+        // Логика кнопок
         function placeBet() {
             const amount = parseFloat(document.getElementById('bet').value);
             fetch('/api/place_bet', {
@@ -121,12 +258,43 @@
 
         function closeOverlay() {
             document.getElementById('overlay').style.display = 'none';
-            // Очистка сетки
-            document.querySelectorAll('.cell').forEach(c => {
-                c.classList.remove('winner-cell', 'active');
+            // Очистка анимации
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('winner-cell'));
+            sync(); // Сразу синхронизируем, чтобы поле сбросилось
+        }
+
+        function usePromo() {
+            const promo = document.getElementById('promo-input').value;
+            fetch('/api/use_promo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({uid, promo})
+            }).then(r => r.json()).then(res => {
+                tg.showAlert(res.message);
+                sync();
             });
         }
 
+        // Навигация
+        function switchView(viewName) {
+            currentView = viewName;
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            document.getElementById(`nav-${viewName}`).classList.add('active');
+            tg.HapticFeedback.selectionChanged();
+            sync();
+        }
+
+        function copyRef() {
+            const link = document.getElementById('ref-link').innerText;
+            navigator.clipboard.writeText(link).then(() => {
+                tg.showAlert("Ссылка скопирована!");
+            });
+        }
+
+        // Запуск
         setInterval(sync, 1000);
         sync();
     </script>
