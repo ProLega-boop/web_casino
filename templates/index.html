@@ -2,169 +2,137 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PvP Roulette</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root { 
-        --bg: #0b0e14; --panel: #1a1f26; --accent: #007aff; --text: #fff; 
-        --gold: #ffcf40; --red: #ff3b30; --green: #34c759;
-    }
-    body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; overflow: hidden; height: 100vh; }
-    
-    #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
-    .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 90px; }
-    .view.active { display: flex; flex-direction: column; }
+    <style>
+        :root { 
+            --bg: #0b0e14; --panel: #1a1f26; --accent: #007aff; --text: #fff; 
+            --gold: #ffcf40; --red: #ff3b30; --green: #34c759;
+        }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; overflow: hidden; height: 100vh; }
+        
+        #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
+        .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 100px; }
+        .view.active { display: flex; flex-direction: column; }
 
-    /* Хедер PvP (Баланс и История) */
-    .pvp-header { position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px; }
-    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .balance-badge { background: rgba(0,122,255,0.15); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 20px; color: var(--accent); font-weight: bold; }
+        /* Хедер */
+        .pvp-header { background: var(--bg); padding-bottom: 10px; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .balance-badge { background: rgba(0,122,255,0.15); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 20px; color: var(--accent); font-weight: bold; }
 
-    .history-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .hist-card { background: var(--panel); border-radius: 12px; padding: 8px; display: flex; align-items: center; gap: 8px; font-size: 11px; border: 1px solid #222; }
-    .hist-card img { width: 18px; height: 18px; border-radius: 50%; }
-    .hist-card span { color: #8e8e93; }
-    .hist-card b { color: var(--green); }
+        .history-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .hist-card { background: var(--panel); border-radius: 12px; padding: 8px; display: flex; align-items: center; gap: 8px; font-size: 11px; border: 1px solid #222; }
+        .hist-card b { color: var(--green); }
 
-    /* Поле Игры */
-    .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 15px 0 5px; }
-    #arena { 
-        position: relative; width: 100%; height: 220px; /* Увеличили */
-        border-radius: 20px; border: 1px solid #2c323a; overflow: hidden; 
-        background: repeating-conic-gradient(from 45deg, #111 0% 25%, #161616 25% 50%) 0 0/ 20px 20px; 
-    }
-    
-    /* Скрываем старый метеорит до 2 этапа */
-    #meteor, #shadow, #timer { display: none; }
+        /* Поле */
+        .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 15px 0 5px; }
+        #arena { 
+            position: relative; width: 100%; height: 220px; border-radius: 20px; border: 1px solid #2c323a; overflow: hidden; 
+            background: repeating-conic-gradient(from 45deg, #111 0% 25%, #161616 25% 50%) 0 0/ 20px 20px; 
+        }
 
-    /* Панель ставок (Теперь это блок для ввода суммы) */
-    .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; border: 1px solid #2c323a; }
-    .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
-    .input-group input { background: transparent; border: none; color: #fff; flex: 1; padding: 10px; font-size: 18px; outline: none; }
-    .input-group span { color: #8e8e93; font-weight: bold; }
-    .input-group img { width: 16px; margin-right: 5px; }
+        /* Объемные кнопки */
+        .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; border: 1px solid #2c323a; }
+        .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
+        .input-group input { background: transparent; border: none; color: #fff; flex: 1; padding: 10px; font-size: 18px; outline: none; }
+        
+        .quick-bets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
+        .q-btn { 
+            background: linear-gradient(180deg, #2c3546 0%, #1a1f2a 100%); 
+            border: none; color: #fff; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: bold;
+            box-shadow: 0 4px 0 #0f1218; transition: 0.1s;
+        }
+        .q-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f1218; }
 
-    /* Кнопки Объемные снизу */
-    .quick-bets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
-    .q-btn { 
-        background: linear-gradient(180deg, #2c3546 0%, #1a1f2a 100%); 
-        border: none; color: #fff; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: bold;
-        box-shadow: 0 4px 0 #0f1218, inset 0 1px 0 rgba(255,255,255,0.05); transition: 0.1s;
-    }
-    .q-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f1218; }
-    .q-btn.max { background: linear-gradient(180deg, #1a1f2a 0%, #2c3546 100%); color: var(--gold); }
+        .btn-main { 
+            background: linear-gradient(180deg, #3897f0 0%, #007aff 100%); 
+            border: none; color: #fff; width: 100%; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; 
+            box-shadow: 0 5px 0 #0056b3; transition: 0.1s;
+        }
+        .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 0 #0056b3; }
 
-    .btn-main { 
-        background: linear-gradient(180deg, #3897f0 0%, #007aff 100%); 
-        border: none; color: #fff; width: 100%; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; 
-        box-shadow: 0 5px 0 #0056b3, inset 0 1px 1px rgba(255,255,255,0.3); transition: 0.1s;
-    }
-    .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 0 #0056b3; }
+        /* Ставки */
+        .player-row { 
+            background: var(--panel); border-radius: 15px; padding: 12px; 
+            display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; 
+            margin-bottom: 8px; border: 1px solid transparent; 
+        }
+        .player-row.is-me { border-color: var(--accent); }
+        .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; }
 
-    /* Список ставок как на Фото 1 */
-    .bets-wrap { margin-top: 15px; }
-    .player-row { 
-        background: var(--panel); border-radius: 15px; padding: 12px; 
-        display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; 
-        margin-bottom: 8px; border: 1px solid transparent; 
-    }
-    .player-row.is-me { border-color: var(--accent); background: rgba(0,122,255,0.05); }
-    
-    .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
-    .player-info { display: flex; flex-direction: column; }
-    .player-info span { font-weight: bold; }
-    .player-info small { color: #8e8e93; }
-    
-    .player-chance { text-align: right; }
-    .player-chance b { color: var(--text); }
-    .player-chance small { color: rgba(255,255,255,0.4); }
-
-    /* Модалка выигрыша (Скрыта до Этапа 2) */
-    #win-popup { display: none; }
-</style>
+        /* Модалка выигрыша */
+        #win-popup { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 80%; background: var(--panel); border-radius: 25px; padding: 25px; 
+            text-align: center; display: none; z-index: 100; border: 2px solid var(--gold);
+        }
+    </style>
 </head>
 <body>
     <div id="app">
         <div id="pvp" class="view active">
-            <div class="header-info">
-                <div class="balance-badge"><span id="pvp-bal">0.00</span> TON</div>
-                <div style="text-align: right;"><small style="color:#8e8e93">POOL</small><br><b id="pool" style="color:var(--gold)">0.00</b></div>
+            <div class="pvp-header">
+                <div class="header-row">
+                    <div class="balance-badge"><span id="pvp-bal">0.00</span> TON</div>
+                    <div style="font-size:12px; color:#8e8e93">GAME <b id="game-id" style="color:#fff">#LIVE</b></div>
+                </div>
+                <div class="history-row">
+                    <div class="hist-card"><span>🏆 TOP</span> <b id="htprize">+0.00</b></div>
+                    <div class="hist-card"><span>⏱ LAST</span> <b id="hlprize">+0.00</b></div>
+                </div>
             </div>
 
+            <div class="pool-box">POOL: <span id="pool">0.00</span> TON</div>
+            
             <div id="arena">
-                <div id="shadow" class="shadow-circle"></div>
-                <img id="meteor" class="meteor" src="https://cdn-icons-png.flaticon.com/512/2530/2530851.png">
-                <div id="timer" style="position:absolute; width:100%; text-align:center; top:70px; font-weight:bold; color:#444;">ОЖИДАНИЕ...</div>
+                <div id="timer" style="position:absolute; width:100%; text-align:center; top:45%; font-weight:bold; color:rgba(255,255,255,0.2);">ОЖИДАНИЕ...</div>
             </div>
 
             <div class="bet-control">
                 <div class="input-group">
-                    <input type="number" id="bet-input" value="0.1" step="0.1" min="0.1">
+                    <input type="number" id="bet-input" value="0.5" step="0.1">
                     <span>TON</span>
                 </div>
                 <div class="quick-bets">
                     <button class="q-btn" onclick="setBet(0.1)">0.1</button>
+                    <button class="q-btn" onclick="setBet(0.5)">0.5</button>
                     <button class="q-btn" onclick="setBet(1)">1</button>
                     <button class="q-btn" onclick="setBet(5)">5</button>
-                    <button class="q-btn" onclick="setBet(10)">10</button>
                     <button class="q-btn max" onclick="setMax()">MAX</button>
                 </div>
                 <button class="btn-main" onclick="doBet()">ПОСТАВИТЬ</button>
             </div>
-
             <div id="bets" style="margin-top:15px"></div>
         </div>
 
         <div id="profile" class="view">
-            <div style="text-align:center; padding:20px;">
-                <div style="width:80px; height:80px; background:var(--accent); border-radius:50%; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; font-size:30px;" id="pav">?</div>
+            <div style="text-align:center; padding:20px; background:var(--panel); border-radius:20px;">
+                <div class="player-av" style="width:70px; height:70px; margin:0 auto 10px; font-size:24px;" id="pav">?</div>
                 <h2 id="pname" style="margin:0">User</h2>
                 <div style="font-size:24px; color:var(--gold); font-weight:bold; margin:10px 0;"><span id="pbal">0.00</span> TON</div>
             </div>
-
             <div class="bet-control">
                 <b style="color:var(--accent)">🎟 ПРОМОКОД</b>
-                <div class="input-group" style="margin-top:10px">
-                    <input type="text" id="promo-input" placeholder="Введите код...">
-                </div>
-                <button class="btn-main" style="padding:10px; font-size:14px;" onclick="usePromo()">АКТИВИРОВАТЬ</button>
+                <div class="input-group" style="margin-top:10px"><input type="text" id="promo-input" placeholder="Код..."></div>
+                <button class="btn-main" style="padding:10px;" onclick="usePromo()">АКТИВИРОВАТЬ</button>
             </div>
         </div>
 
-        <nav style="position:fixed; bottom:0; width:100%; background:var(--panel); display:flex; padding:15px 0; border-top:1px solid #2c323a;">
-            <button onclick="go('pvp')" style="flex:1; background:none; border:none; color:#fff;">⚔️ PvP</button>
-            <button onclick="go('profile')" style="flex:1; background:none; border:none; color:#fff;">👤 Профиль</button>
+        <nav style="position:fixed; bottom:0; width:100%; background:var(--panel); display:flex; padding:10px 15px; border-top:1px solid #2c323a; box-sizing:border-box; gap:10px;">
+            <button onclick="go('pvp')" class="btn-main" style="flex:1; padding:12px;">⚔️ PvP</button>
+            <button onclick="go('profile')" class="btn-main" style="flex:1; padding:12px; background:#333; box-shadow:0 4px 0 #111;">👤 Профиль</button>
         </nav>
     </div>
 
-        <div id="profile" class="view">
-            <div class="p-info">
-                <div class="p-av" id="pav">?</div>
-                <h2 id="pname" style="margin:5px 0;">User</h2>
-                <div style="color:var(--gold); font-size:24px; font-weight:bold;"><span id="pbal">0.00</span> TON</div>
-            </div>
-            <div class="stat-card" style="text-align:left; width:100%; box-sizing:border-box;">
-                <b style="color:var(--accent);">💎 РЕФЕРАЛЫ</b><br>
-                Приглашено: <span id="ref-c">0</span><br>
-                Заработано: <span id="ref-e">0.00</span> TON
-                <div id="ref-l" style="font-size:10px; color:#555; margin-top:10px; word-break:break-all;"></div>
-            </div>
-        </div>
-
-        <nav class="navbar">
-            <button class="nav-link active" id="btn-pvp" onclick="go('pvp')">⚔️ PvP</button>
-            <button class="nav-link" id="btn-profile" onclick="go('profile')">👤 Профиль</button>
-        </nav>
-    </div>
-    ```
-<div id="win-popup">
-        <h3 style="margin:0; color:var(--gold); letter-spacing:1px;">РАУНД ОКОНЧЕН</h3>
+    <div id="win-popup">
+        <h3 style="margin:0; color:var(--gold);">РАУНД ОКОНЧЕН</h3>
         <div id="w-name" style="font-size:20px; margin:15px 0; font-weight:bold;"></div>
-        <div id="w-prize" style="font-size:26px; font-weight:bold; color:var(--win);"></div>
-        <button class="btn-bet" style="padding:10px; margin-top:15px; font-size:14px;" onclick="document.getElementById('win-popup').style.display='none'">КРУТО!</button>
+        <div id="w-prize" style="font-size:26px; font-weight:bold; color:var(--green);"></div>
+        <button class="btn-main" style="padding:10px;" onclick="document.getElementById('win-popup').style.display='none'">КРУТО!</button>
     </div>
 
-   <script>
+    <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
@@ -173,9 +141,7 @@
         
         let userBal = 0;
         let currentTab = 'pvp';
-        let isAnimating = false;
 
-        // Переключение вкладок
         function go(t) {
             currentTab = t;
             document.getElementById('pvp').classList.toggle('active', t === 'pvp');
@@ -183,121 +149,49 @@
             sync();
         }
 
-        // Установка суммы ставки
-        function setBet(val) {
-            document.getElementById('bet-input').value = val;
-            tg.HapticFeedback.impactOccurred('light');
-        }
+        function setBet(val) { document.getElementById('bet-input').value = val; }
+        function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
 
-        function setMax() {
-            document.getElementById('bet-input').value = userBal.toFixed(2);
-            tg.HapticFeedback.impactOccurred('medium');
-        }
-
-        // Логика ставки
         async function doBet() {
             const amt = parseFloat(document.getElementById('bet-input').value);
-            if (isNaN(amt) || amt <= 0) return;
-            
-            if (amt > userBal) {
-                tg.showAlert("Недостаточно TON!");
-                return;
-            }
-
+            if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
             const r = await fetch('/api/place_bet', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ uid: uid, amount: amt })
             });
-            const res = await r.json();
-            
-            if (res.status === 'ok') {
-                tg.HapticFeedback.notificationOccurred('success');
-                sync(); 
-            } else {
-                tg.showAlert(res.message || "Ошибка!");
-            }
+            sync();
         }
 
-        // Промокод
-        async function usePromo() {
-            const code = document.getElementById('promo-input').value;
-            const r = await fetch('/api/use_promo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ uid: uid, code: code })
-            });
-            const res = await r.json();
-            if (res.status === 'ok') {
-                tg.showAlert(`Успех! Получено ${res.bonus} TON`);
-                sync();
-            } else {
-                tg.showAlert("Неверный код или уже использован");
-            }
-        }
-
-        // Синхронизация данных
         async function sync() {
             try {
                 const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
                 const d = await r.json();
-
                 userBal = d.user.bal;
-                
-                // Обновляем баланс везде
                 document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
                 document.getElementById('pbal').innerText = userBal.toFixed(2);
                 document.getElementById('pname').innerText = uname;
-                document.getElementById('pav').innerText = uname[0].toUpperCase();
+                document.getElementById('pav').innerText = uname[0];
 
                 if (currentTab === 'pvp') {
-                    document.getElementById('pool').innerText = d.game.total_pool?.toFixed(2) || "0.00";
-                    document.getElementById('timer').innerText = d.game.is_active ? `УДАР ЧЕРЕЗ: ${d.game.timer}с` : "ОЖИДАНИЕ ИГРОКОВ...";
+                    document.getElementById('pool').innerText = d.game.players ? Object.values(d.game.players).reduce((a,b)=>a+b, 0).toFixed(2) : "0.00";
                     
                     const bWrap = document.getElementById('bets');
                     bWrap.innerHTML = '';
-
-                    // Сортировка: Твоя ставка первая
-                    let allBets = d.bets.sort((a, b) => b.amount - a.amount);
-                    let myIdx = allBets.findIndex(b => b.uid == uid);
-                    
-                    if (myIdx > -1) {
-                        let myBet = allBets.splice(myIdx, 1)[0];
-                        renderBet(myBet, true, bWrap);
-                    }
-                    allBets.forEach(b => renderBet(b, false, bWrap));
-
-                    if (d.game.timer === 1 && !isAnimating) animateMeteor();
+                    d.bets.forEach(b => {
+                        const div = document.createElement('div');
+                        div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
+                        div.innerHTML = `
+                            <div class="player-av">${b.name[0]}</div>
+                            <div class="player-info"><span>${b.name}</span><small>Ставка</small></div>
+                            <div class="player-chance"><b>${b.amount.toFixed(2)}</b><br><small>TON</small></div>`;
+                        bWrap.appendChild(div);
+                    });
                 }
-            } catch (e) { console.error(e); }
+            } catch(e) {}
         }
 
-        function renderBet(b, isMe, container) {
-            const div = document.createElement('div');
-            div.className = `bet-row ${isMe ? 'is-me' : ''}`;
-            div.innerHTML = `
-                <div class="u">
-                    <div class="av" style="background:${isMe ? 'var(--accent)' : '#333'}">${b.name[0]}</div>
-                    <span>${isMe ? 'ВЫ' : b.name}</span>
-                </div>
-                <b>${b.amount.toFixed(2)} TON</b>`;
-            container.appendChild(div);
-        }
-
-        function animateMeteor() {
-            isAnimating = true;
-            const m = document.getElementById('meteor');
-            const s = document.getElementById('shadow');
-            s.style.opacity = "1"; s.style.width = "90px"; s.style.height = "25px";
-            m.style.display = 'block';
-            m.style.top = '120px';
-            setTimeout(() => {
-                m.style.display = 'none'; m.style.top = '-100px';
-                isAnimating = false;
-            }, 1000);
-        }
-
-        setInterval(sync, 1000);
+        setInterval(sync, 2000);
         sync();
     </script>
 </body>
