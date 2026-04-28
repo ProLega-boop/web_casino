@@ -4,34 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-   <style>
-    :root { --bg: #0b0e14; --panel: #1a222c; --accent: #007aff; --text: #fff; --gold: #ffcf40; --green: #00f2ff; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; user-select: none; }
+  <style>
+    :root { 
+        --bg: #0b0e14; --panel: #1a1f26; --accent: #007aff; --text: #fff; 
+        --gold: #ffcf40; --red: #ff3b30; --green: #34c759;
+    }
+    body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; overflow: hidden; height: 100vh; }
     
-    #app { display: flex; flex-direction: column; height: 100vh; }
-    .view { display: none; flex: 1; padding: 15px; overflow-y: auto; padding-bottom: 100px; }
+    #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
+    .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 90px; }
     .view.active { display: flex; flex-direction: column; }
 
-    /* PvP UI */
-    .header-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    /* Хедер PvP (Баланс и История) */
+    .pvp-header { position: sticky; top: 0; background: var(--bg); z-index: 10; padding-bottom: 10px; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .balance-badge { background: rgba(0,122,255,0.15); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 20px; color: var(--accent); font-weight: bold; }
 
-    .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; }
+    .history-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hist-card { background: var(--panel); border-radius: 12px; padding: 8px; display: flex; align-items: center; gap: 8px; font-size: 11px; border: 1px solid #222; }
+    .hist-card img { width: 18px; height: 18px; border-radius: 50%; }
+    .hist-card span { color: #8e8e93; }
+    .hist-card b { color: var(--green); }
+
+    /* Поле Игры */
+    .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 15px 0 5px; }
+    #arena { 
+        position: relative; width: 100%; height: 220px; /* Увеличили */
+        border-radius: 20px; border: 1px solid #2c323a; overflow: hidden; 
+        background: repeating-conic-gradient(from 45deg, #111 0% 25%, #161616 25% 50%) 0 0/ 20px 20px; 
+    }
+    
+    /* Скрываем старый метеорит до 2 этапа */
+    #meteor, #shadow, #timer { display: none; }
+
+    /* Панель ставок (Теперь это блок для ввода суммы) */
+    .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; border: 1px solid #2c323a; }
     .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
     .input-group input { background: transparent; border: none; color: #fff; flex: 1; padding: 10px; font-size: 18px; outline: none; }
     .input-group span { color: #8e8e93; font-weight: bold; }
+    .input-group img { width: 16px; margin-right: 5px; }
 
+    /* Кнопки Объемные снизу */
     .quick-bets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
-    .q-btn { background: #252c38; border: none; color: #fff; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: bold; }
-    .q-btn.max { background: var(--accent); }
+    .q-btn { 
+        background: linear-gradient(180deg, #2c3546 0%, #1a1f2a 100%); 
+        border: none; color: #fff; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: bold;
+        box-shadow: 0 4px 0 #0f1218, inset 0 1px 0 rgba(255,255,255,0.05); transition: 0.1s;
+    }
+    .q-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f1218; }
+    .q-btn.max { background: linear-gradient(180deg, #1a1f2a 0%, #2c3546 100%); color: var(--gold); }
 
-    .btn-main { background: var(--accent); border: none; color: #fff; width: 100%; padding: 15px; border-radius: 15px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,122,255,0.3); }
-    .btn-main:active { transform: scale(0.96); }
+    .btn-main { 
+        background: linear-gradient(180deg, #3897f0 0%, #007aff 100%); 
+        border: none; color: #fff; width: 100%; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; 
+        box-shadow: 0 5px 0 #0056b3, inset 0 1px 1px rgba(255,255,255,0.3); transition: 0.1s;
+    }
+    .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 0 #0056b3; }
 
-    /* Остальные стили (Метеорит, Карточки) оставь из прошлой части... */
-    #arena { position: relative; height: 160px; background: #111; border-radius: 15px; overflow: hidden; margin-bottom: 10px; border: 1px solid #222; }
-    .meteor { position: absolute; top: -100px; left: 50%; width: 50px; display: none; z-index: 5; }
-    .shadow-circle { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); border-radius: 50%; opacity: 0; transition: 0.5s; }
+    /* Список ставок как на Фото 1 */
+    .bets-wrap { margin-top: 15px; }
+    .player-row { 
+        background: var(--panel); border-radius: 15px; padding: 12px; 
+        display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; 
+        margin-bottom: 8px; border: 1px solid transparent; 
+    }
+    .player-row.is-me { border-color: var(--accent); background: rgba(0,122,255,0.05); }
+    
+    .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+    .player-info { display: flex; flex-direction: column; }
+    .player-info span { font-weight: bold; }
+    .player-info small { color: #8e8e93; }
+    
+    .player-chance { text-align: right; }
+    .player-chance b { color: var(--text); }
+    .player-chance small { color: rgba(255,255,255,0.4); }
+
+    /* Модалка выигрыша (Скрыта до Этапа 2) */
+    #win-popup { display: none; }
 </style>
 </head>
 <body>
