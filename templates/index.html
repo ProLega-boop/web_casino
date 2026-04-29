@@ -210,15 +210,15 @@
     ctx.rotate(currentRotation);
     ctx.translate(-centerX, -centerY);
 
-        if (bets.length === 0) {
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = thickness;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.stroke();
-            return;
-        }
-
+       if (bets.length === 0) {
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = thickness;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        // Убрали return отсюда!
+    } else {
+        // Отрисовка секторов (этот блок выполняется, если есть ставки)
         bets.forEach(b => {
             const sliceAngle = (b.amount / total) * 2 * Math.PI;
             ctx.strokeStyle = stringToColor(b.name);
@@ -229,15 +229,20 @@
             ctx.stroke();
             startAngle += sliceAngle;
         });
+    }
 
-        // Рисуем ПРИЦЕЛ (белый треугольник сверху)
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY - radius - 15);
-        ctx.lineTo(centerX - 8, centerY - radius - 28);
-        ctx.lineTo(centerX + 8, centerY - radius - 28);
-        ctx.closePath();
-        ctx.fill();
+    // 1. Сначала отменяем поворот холста
+    ctx.restore(); 
+
+    // 2. Теперь рисуем прицел (он будет статичным)
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - radius - 12);
+    ctx.lineTo(centerX - 8, centerY - radius - 25);
+    ctx.lineTo(centerX + 8, centerY - radius - 25);
+    ctx.closePath();
+    ctx.fill();
+} // Конец функции drawCircle
     }
 
     async function sync() {
