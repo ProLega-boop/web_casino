@@ -13,10 +13,11 @@
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; overflow: hidden; height: 100vh; }
         
         #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
-        .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 100px; }
+        
+        /* Главный контейнер для скролла */
+        .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 100px; box-sizing: border-box; }
         .view.active { display: flex; flex-direction: column; }
 
-        /* Хедер */
         .pvp-header { background: var(--bg); padding-bottom: 10px; }
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .balance-badge { background: rgba(0,122,255,0.15); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 20px; color: var(--accent); font-weight: bold; }
@@ -25,23 +26,15 @@
         .hist-card { background: var(--panel); border-radius: 12px; padding: 8px; display: flex; align-items: center; gap: 8px; font-size: 11px; border: 1px solid #222; }
         .hist-card b { color: var(--green); }
 
-        /* Поле */
-        .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 15px 0 5px; }
-       #arena {
-    position: relative;
-    width: 100%;
-    height: 250px;
-    border-radius: 20px;
-    border: 1px solid #2c323a;
-    overflow: hidden;
-    background: #111;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
+        .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 5px 0 10px; }
+        
+        #arena {
+            position: relative; width: 100%; height: 250px; border-radius: 20px;
+            border: 1px solid #2c323a; overflow: hidden; background: #111;
+            display: flex; justify-content: center; align-items: center; flex-shrink: 0;
+        }
 
-        /* Объемные кнопки */
-        .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; border: 1px solid #2c323a; }
+        .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 15px; border: 1px solid #2c323a; flex-shrink: 0; }
         .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
         .input-group input { background: transparent; border: none; color: #fff; flex: 1; padding: 10px; font-size: 18px; outline: none; }
         
@@ -60,16 +53,16 @@
         }
         .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 0 #0056b3; }
 
-        /* Ставки */
         .player-row { 
             background: var(--panel); border-radius: 15px; padding: 12px; 
             display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; 
             margin-bottom: 8px; border: 1px solid transparent; 
         }
         .player-row.is-me { border-color: var(--accent); }
-        .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; }
+        .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-weight: bold; }
 
-        /* Модалка выигрыша */
+        nav { position: fixed; bottom: 0; width: 100%; background: var(--panel); display: flex; padding: 10px 15px; border-top: 1px solid #2c323a; box-sizing: border-box; gap: 10px; z-index: 50; }
+        
         #win-popup { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             width: 80%; background: var(--panel); border-radius: 25px; padding: 25px; 
@@ -79,7 +72,8 @@
 </head>
 <body>
     <div id="app">
-       <div id="pvp" class="view active">
+        <!-- Вкладка PvP -->
+        <div id="pvp" class="view active">
             <div class="pvp-header">
                 <div class="header-row">
                     <div class="balance-badge"><span id="pvp-bal">0.00</span> TON</div>
@@ -100,22 +94,6 @@
                 </div>
             </div>
 
-    <!-- Арена: фиксированная высота, по центру -->
-    <div id="arena" style="width: 100%; height: 250px; position: relative; background: #111; border-radius: 20px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin: 15px 0; border: 1px solid #2c323a;">
-        <!-- Холст для круга -->
-        <canvas id="wheelCanvas" width="220" height="220"></canvas>
-        
-        <!-- Таймер по центру круга -->
-        <div style="position: absolute; text-align: center; pointer-events: none; z-index: 10;">
-            <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase; letter-spacing: 1px;">Удар через</div>
-            <div id="timer" style="font-size: 32px; font-weight: bold; color: #ffcf40;">00:15</div>
-        </div>
-    </div>
-        <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase;">Удар через</div>
-        <div id="timer" style="font-size: 28px; font-weight: bold; color: #ffcf40;">00:15</div>
-    </div>
-</div>
-
             <div class="bet-control">
                 <div class="input-group">
                     <input type="number" id="bet-input" value="0.5" step="0.1">
@@ -126,13 +104,15 @@
                     <button class="q-btn" onclick="setBet(0.5)">0.5</button>
                     <button class="q-btn" onclick="setBet(1)">1</button>
                     <button class="q-btn" onclick="setBet(5)">5</button>
-                    <button class="q-btn max" onclick="setMax()">MAX</button>
+                    <button class="q-btn" onclick="setMax()">MAX</button>
                 </div>
                 <button class="btn-main" onclick="doBet()">ПОСТАВИТЬ</button>
             </div>
+
             <div id="bets" style="margin-top:15px"></div>
         </div>
 
+        <!-- Вкладка Профиль -->
         <div id="profile" class="view">
             <div style="text-align:center; padding:20px; background:var(--panel); border-radius:20px;">
                 <div class="player-av" style="width:70px; height:70px; margin:0 auto 10px; font-size:24px;" id="pav">?</div>
@@ -146,7 +126,7 @@
             </div>
         </div>
 
-        <nav style="position:fixed; bottom:0; width:100%; background:var(--panel); display:flex; padding:10px 15px; border-top:1px solid #2c323a; box-sizing:border-box; gap:10px;">
+        <nav>
             <button onclick="go('pvp')" class="btn-main" style="flex:1; padding:12px;">⚔️ PvP</button>
             <button onclick="go('profile')" class="btn-main" style="flex:1; padding:12px; background:#333; box-shadow:0 4px 0 #111;">👤 Профиль</button>
         </nav>
@@ -159,144 +139,140 @@
         <button class="btn-main" style="padding:10px;" onclick="document.getElementById('win-popup').style.display='none'">КРУТО!</button>
     </div>
 
-   <script>
-       let currentRotation = 0; // Угол поворота колеса
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+    <script>
+        let currentRotation = 0;
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-    const uid = tg.initDataUnsafe?.user?.id || "local_user";
-    const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
+        const uid = tg.initDataUnsafe?.user?.id || "local_user";
+        const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
 
-    let userBal = 0;
-    let currentTab = 'pvp';
+        let userBal = 0;
+        let currentTab = 'pvp';
 
-    function go(t) {
-        currentTab = t;
-        document.getElementById('pvp').classList.toggle('active', t === 'pvp');
-        document.getElementById('profile').classList.toggle('active', t === 'profile');
-        sync();
-    }
-
-    function setBet(val) { document.getElementById('bet-input').value = val; }
-    function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
-
-    async function doBet() {
-        const amt = parseFloat(document.getElementById('bet-input').value);
-        if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
-        const r = await fetch('/api/place_bet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: uid, amount: amt })
-        });
-        sync();
-    }
-
-    function stringToColor(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        function go(t) {
+            currentTab = t;
+            document.getElementById('pvp').classList.toggle('active', t === 'pvp');
+            document.getElementById('profile').classList.toggle('active', t === 'profile');
+            sync();
         }
-        return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
-    }
 
-   function drawCircle(bets, total) {
-        const canvas = document.getElementById('wheelCanvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = 90;
-        const thickness = 18;
-        let startAngle = -Math.PI / 2;
+        function setBet(val) { document.getElementById('bet-input').value = val; }
+        function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(currentRotation);
-        ctx.translate(-centerX, -centerY);
-
-        if (bets.length === 0) {
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = thickness;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.stroke();
-        } else {
-            bets.forEach(b => {
-                const sliceAngle = (b.amount / total) * 2 * Math.PI;
-                ctx.strokeStyle = stringToColor(b.name);
-                ctx.lineWidth = thickness;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
-                ctx.stroke();
-                startAngle += sliceAngle;
+        async function doBet() {
+            const amt = parseFloat(document.getElementById('bet-input').value);
+            if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
+            await fetch('/api/place_bet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: uid, amount: amt })
             });
+            sync();
         }
 
-        ctx.restore(); 
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
+        }
 
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY - radius - 12);
-        ctx.lineTo(centerX - 8, centerY - radius - 25);
-        ctx.lineTo(centerX + 8, centerY - radius - 25);
-        ctx.closePath();
-        ctx.fill();
-    } // ТУТ БЫЛА ЛИШНЯЯ СКОБКА, ТЕПЕРЬ ОДНА
-    async function sync() {
-        try {
-            const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
-            const d = await r.json();
-            
-            userBal = d.user.bal;
-            document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
-            document.getElementById('pbal').innerText = userBal.toFixed(2);
+        function drawCircle(bets, total) {
+            const canvas = document.getElementById('wheelCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 90;
+            const thickness = 18;
+            let startAngle = -Math.PI / 2;
 
-            // Обновляем TOP и LAST
-            if (d.game) {
-                document.getElementById('htprize').innerText = `+${(d.game.top_win || 0).toFixed(2)}`;
-                document.getElementById('hlprize').innerText = `+${(d.game.last_win || 0).toFixed(2)}`;
-                
-                // Обновляем таймер
-                const tEl = document.getElementById('timer');
-                if (tEl) {
-                    if (d.game.timer <= 0) {
-                tEl.innerText = "БОЙ!";
-                tEl.style.color = "#ff4d4d";
-                currentRotation += 0.15; // ДОБАВЬ ЭТУ СТРОКУ
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentRotation);
+            ctx.translate(-centerX, -centerY);
+
+            if (bets.length === 0) {
+                ctx.strokeStyle = '#222';
+                ctx.lineWidth = thickness;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
             } else {
-                tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
-                tEl.style.color = "#ffcf40";
-                currentRotation = 0; // И ЭТУ (чтобы сбросить вращение в новом раунде)
-            }
-                }
-            }
-
-            if (currentTab === 'pvp') {
-                const bWrap = document.getElementById('bets');
-                bWrap.innerHTML = '';
-                
-                const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
-                const poolEl = document.getElementById('pool');
-                if (poolEl) poolEl.innerText = totalPool.toFixed(2);
-
-                d.bets.forEach(b => {
-                    const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
-                    const div = document.createElement('div');
-                    div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
-                    div.innerHTML = `
-                        <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
-                        <div class="player-info"><span>${b.name}</span><small>Ставка: ${b.amount.toFixed(2)}</small></div>
-                        <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
-                    bWrap.appendChild(div);
+                bets.forEach(b => {
+                    const sliceAngle = (b.amount / total) * 2 * Math.PI;
+                    ctx.strokeStyle = stringToColor(b.name);
+                    ctx.lineWidth = thickness;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
+                    ctx.stroke();
+                    startAngle += sliceAngle;
                 });
-
-                drawCircle(d.bets, totalPool || 0.1);
             }
-        } catch(e) { console.error("Sync error:", e); }
-    }
+            ctx.restore(); 
 
-    setInterval(sync, 2000);
-    sync();
-</script>
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY - radius - 12);
+            ctx.lineTo(centerX - 8, centerY - radius - 25);
+            ctx.lineTo(centerX + 8, centerY - radius - 25);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        async function sync() {
+            try {
+                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+                const d = await r.json();
+                
+                userBal = d.user.bal;
+                document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
+                document.getElementById('pbal').innerText = userBal.toFixed(2);
+                document.getElementById('pname').innerText = d.user.name;
+
+                if (d.game) {
+                    document.getElementById('htprize').innerText = `+${(d.game.top_win || 0).toFixed(2)}`;
+                    document.getElementById('hlprize').innerText = `+${(d.game.last_win || 0).toFixed(2)}`;
+                    
+                    const tEl = document.getElementById('timer');
+                    if (d.game.timer <= 0) {
+                        tEl.innerText = "БОЙ!";
+                        tEl.style.color = "#ff4d4d";
+                        currentRotation += 0.15; 
+                    } else {
+                        tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
+                        tEl.style.color = "#ffcf40";
+                        currentRotation = 0;
+                    }
+                }
+
+                if (currentTab === 'pvp') {
+                    const bWrap = document.getElementById('bets');
+                    bWrap.innerHTML = '';
+                    const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
+                    document.getElementById('pool').innerText = totalPool.toFixed(2);
+
+                    d.bets.forEach(b => {
+                        const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
+                        const div = document.createElement('div');
+                        div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
+                        div.innerHTML = `
+                            <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
+                            <div class="player-info"><b>${b.name}</b><br><small>Ставка: ${b.amount.toFixed(2)}</small></div>
+                            <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
+                        bWrap.appendChild(div);
+                    });
+                    drawCircle(d.bets, totalPool || 0.1);
+                }
+            } catch(e) { console.error("Sync error:", e); }
+        }
+
+        setInterval(sync, 1000);
+        sync();
+    </script>
+</body>
+</html>
