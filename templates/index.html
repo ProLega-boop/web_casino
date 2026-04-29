@@ -27,10 +27,18 @@
 
         /* Поле */
         .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 15px 0 5px; }
-        #arena { 
-            position: relative; width: 100%; height: 220px; border-radius: 20px; border: 1px solid #2c323a; overflow: hidden; 
-            background: repeating-conic-gradient(from 45deg, #111 0% 25%, #161616 25% 50%) 0 0/ 20px 20px; 
-        }
+       #arena {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    border-radius: 20px;
+    border: 1px solid #2c323a;
+    overflow: hidden;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
         /* Объемные кнопки */
         .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 10px; border: 1px solid #2c323a; }
@@ -75,19 +83,29 @@
             <div class="pvp-header">
                 <div class="header-row">
                     <div class="balance-badge"><span id="pvp-bal">0.00</span> TON</div>
-                    <div style="font-size:12px; color:#8e8e93">GAME <b id="game-id" style="color:#fff">#LIVE</b></div>
-                </div>
-                <div class="history-row">
-                    <div class="hist-card"><span>🏆 TOP</span> <b id="htprize">+0.00</b></div>
-                    <div class="hist-card"><span>⏱ LAST</span> <b id="hlprize">+0.00</b></div>
-                </div>
+               <div class="history-row">
+            <div class="hist-card">
+                <span>🏆 TOP</span>
+                <b id="htprize">+0.00</b>
             </div>
+            <div class="hist-card">
+                <span>⏱ LAST</span>
+                <b id="hlprize">+0.00</b>
+            </div>
+        </div>
+    </div> <!-- Закрыли pvp-header -->
 
-            <div class="pool-box">POOL: <span id="pool">0.00</span> TON</div>
-            
-<div id="arena" style="position: relative; width: 100%; height: 250px; display: flex; justify-content: center; align-items: center; background: #111; border-radius: 20px; margin: 10px 0; border: 1px solid #2c323a;">
-    <canvas id="wheelCanvas" width="220" height="220"></canvas>
-    <div style="position: absolute; text-align: center; pointer-events: none;">
+    <!-- Арена: фиксированная высота, по центру -->
+    <div id="arena" style="width: 100%; height: 250px; position: relative; background: #111; border-radius: 20px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin: 15px 0; border: 1px solid #2c323a;">
+        <!-- Холст для круга -->
+        <canvas id="wheelCanvas" width="220" height="220"></canvas>
+        
+        <!-- Таймер по центру круга -->
+        <div style="position: absolute; text-align: center; pointer-events: none; z-index: 10;">
+            <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase; letter-spacing: 1px;">Удар через</div>
+            <div id="timer" style="font-size: 32px; font-weight: bold; color: #ffcf40;">00:15</div>
+        </div>
+    </div>
         <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase;">Удар через</div>
         <div id="timer" style="font-size: 28px; font-weight: bold; color: #ffcf40;">00:15</div>
     </div>
@@ -136,119 +154,143 @@
         <button class="btn-main" style="padding:10px;" onclick="document.getElementById('win-popup').style.display='none'">КРУТО!</button>
     </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+   <script>
+       let currentRotation = 0; // Угол поворота колеса
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
-        const uid = tg.initDataUnsafe?.user?.id || "local_user";
-        const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
-        
-        let userBal = 0;
-        let currentTab = 'pvp';
+    const uid = tg.initDataUnsafe?.user?.id || "local_user";
+    const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
 
-        function go(t) {
-            currentTab = t;
-            document.getElementById('pvp').classList.toggle('active', t === 'pvp');
-            document.getElementById('profile').classList.toggle('active', t === 'profile');
-            sync();
+    let userBal = 0;
+    let currentTab = 'pvp';
+
+    function go(t) {
+        currentTab = t;
+        document.getElementById('pvp').classList.toggle('active', t === 'pvp');
+        document.getElementById('profile').classList.toggle('active', t === 'profile');
+        sync();
+    }
+
+    function setBet(val) { document.getElementById('bet-input').value = val; }
+    function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
+
+    async function doBet() {
+        const amt = parseFloat(document.getElementById('bet-input').value);
+        if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
+        const r = await fetch('/api/place_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: uid, amount: amt })
+        });
+        sync();
+    }
+
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
+    }
+
+    function drawCircle(bets, total) {
+        const canvas = document.getElementById('wheelCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 90;
+        const thickness = 18;
+        let startAngle = -Math.PI / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(currentRotation);
+    ctx.translate(-centerX, -centerY);
+
+        if (bets.length === 0) {
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = thickness;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+            return;
         }
 
-        function setBet(val) { document.getElementById('bet-input').value = val; }
-        function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
+        bets.forEach(b => {
+            const sliceAngle = (b.amount / total) * 2 * Math.PI;
+            ctx.strokeStyle = stringToColor(b.name);
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
+            ctx.stroke();
+            startAngle += sliceAngle;
+        });
 
-        async function doBet() {
-            const amt = parseFloat(document.getElementById('bet-input').value);
-            if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
-            const r = await fetch('/api/place_bet', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ uid: uid, amount: amt })
-            });
-            sync();
-        }
+        // Рисуем ПРИЦЕЛ (белый треугольник сверху)
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - radius - 15);
+        ctx.lineTo(centerX - 8, centerY - radius - 28);
+        ctx.lineTo(centerX + 8, centerY - radius - 28);
+        ctx.closePath();
+        ctx.fill();
+    }
 
-       async function sync() {
-    try {
-        const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
-        const d = await r.json();
-        
-        userBal = d.user.bal;
-        document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
-        document.getElementById('pbal').innerText = userBal.toFixed(2);
-        document.getElementById('pname').innerText = uname;
-        document.getElementById('pav').innerText = uname[0];
-
-        if (currentTab === 'pvp') {
-            const bWrap = document.getElementById('bets');
-            bWrap.innerHTML = '';
+    async function sync() {
+        try {
+            const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+            const d = await r.json();
             
-            const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
-            document.getElementById('pool').innerText = totalPool.toFixed(2);
+            userBal = d.user.bal;
+            document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
+            document.getElementById('pbal').innerText = userBal.toFixed(2);
 
-            d.bets.forEach(b => {
-                const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
-                const div = document.createElement('div');
-                div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
-                div.innerHTML = `
-                    <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
-                    <div class="player-info"><span>${b.name}</span><small>Ставка: ${b.amount.toFixed(2)}</small></div>
-                    <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
-                bWrap.appendChild(div);
-            });
+            // Обновляем TOP и LAST
+            if (d.game) {
+                document.getElementById('htprize').innerText = `+${(d.game.top_win || 0).toFixed(2)}`;
+                document.getElementById('hlprize').innerText = `+${(d.game.last_win || 0).toFixed(2)}`;
+                
+                // Обновляем таймер
+                const tEl = document.getElementById('timer');
+                if (tEl) {
+                    if (d.game.timer <= 0) {
+                        tEl.innerText = "БОЙ!";
+                        tEl.style.color = "#ff4d4d";
+                    } else {
+                        tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
+                        tEl.style.color = "#ffcf40";
+                    }
+                }
+            }
 
-            if (typeof drawCircle === "function") {
+            if (currentTab === 'pvp') {
+                const bWrap = document.getElementById('bets');
+                bWrap.innerHTML = '';
+                
+                const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
+                const poolEl = document.getElementById('pool');
+                if (poolEl) poolEl.innerText = totalPool.toFixed(2);
+
+                d.bets.forEach(b => {
+                    const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
+                    const div = document.createElement('div');
+                    div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
+                    div.innerHTML = `
+                        <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
+                        <div class="player-info"><span>${b.name}</span><small>Ставка: ${b.amount.toFixed(2)}</small></div>
+                        <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
+                    bWrap.appendChild(div);
+                });
+
                 drawCircle(d.bets, totalPool || 0.1);
             }
-
-            if (d.game && d.game.timer !== undefined) {
-                const tEl = document.getElementById('timer');
-                if (tEl) tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
-            }
-        }
-    } catch(e) { console.error(e); }
-}
-        } function stringToColor(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
-            function drawCircle(bets, total) {
-    const canvas = document.getElementById('wheelCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = 90;
-    const thickness = 18;
-    let startAngle = -Math.PI / 2;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (bets.length === 0) {
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = thickness;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-        return;
+        } catch(e) { console.error("Sync error:", e); }
     }
 
-    bets.forEach(b => {
-        const sliceAngle = (b.amount / total) * 2 * Math.PI;
-        ctx.strokeStyle = stringToColor(b.name);
-        ctx.lineWidth = thickness;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
-        ctx.stroke();
-        startAngle += sliceAngle;
-    });
-}
-}
-
-        setInterval(sync, 2000);
-        sync();
-    </script>
-</body>
-</html>
+    setInterval(sync, 2000);
+    sync();
+</script>
