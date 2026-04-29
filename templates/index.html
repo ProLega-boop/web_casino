@@ -176,20 +176,39 @@
                 if (currentTab === 'pvp') {
                     document.getElementById('pool').innerText = d.game.players ? Object.values(d.game.players).reduce((a,b)=>a+b, 0).toFixed(2) : "0.00";
                     
-                    const bWrap = document.getElementById('bets');
-                    bWrap.innerHTML = '';
-                    d.bets.forEach(b => {
-                        const div = document.createElement('div');
-                        div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
-                        div.innerHTML = `
-                            <div class="player-av">${b.name[0]}</div>
-                            <div class="player-info"><span>${b.name}</span><small>Ставка</small></div>
-                            <div class="player-chance"><b>${b.amount.toFixed(2)}</b><br><small>TON</small></div>`;
-                        bWrap.appendChild(div);
-                    });
+                   const bWrap = document.getElementById('bets');
+        bWrap.innerHTML = '';
+        
+        // Считаем общий пул для расчета процентов
+        const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0) || 0.1;
+
+        d.bets.forEach(b => {
+            const chance = ((b.amount / totalPool) * 100).toFixed(1);
+            const div = document.createElement('div');
+            div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
+            div.innerHTML = `
+                <div class="player-av" style="background: ${stringToColor(b.name)}; color: #fff; font-weight: bold;">
+                    ${b.name[0].toUpperCase()}
+                </div>
+                <div class="player-info">
+                    <span>${b.name}</span>
+                    <small>Ставка: ${b.amount.toFixed(2)} TON</small>
+                </div>
+                <div class="player-chance" style="text-align: right;">
+                    <b style="color: var(--accent);">${chance}%</b><br>
+                    <small style="color: #8e8e93;">ШАНС</small>
+                </div>`;
+            bWrap.appendChild(div);
+        });
                 }
             } catch(e) {}
-        }
+        } function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
+}
 
         setInterval(sync, 2000);
         sync();
