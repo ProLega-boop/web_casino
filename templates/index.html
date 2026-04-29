@@ -85,9 +85,13 @@
 
             <div class="pool-box">POOL: <span id="pool">0.00</span> TON</div>
             
-            <div id="arena">
-                <div id="timer" style="position:absolute; width:100%; text-align:center; top:45%; font-weight:bold; color:rgba(255,255,255,0.2);">ОЖИДАНИЕ...</div>
-            </div>
+<div id="arena" style="position: relative; width: 100%; height: 250px; display: flex; justify-content: center; align-items: center; background: #111; border-radius: 20px; margin: 10px 0; border: 1px solid #2c323a;">
+    <canvas id="wheelCanvas" width="220" height="220"></canvas>
+    <div style="position: absolute; text-align: center; pointer-events: none;">
+        <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase;">Удар через</div>
+        <div id="timer" style="font-size: 28px; font-weight: bold; color: #ffcf40;">00:15</div>
+    </div>
+</div>
 
             <div class="bet-control">
                 <div class="input-group">
@@ -163,51 +167,84 @@
             sync();
         }
 
-        async function sync() {
-            try {
-                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
-                const d = await r.json();
-                userBal = d.user.bal;
-                document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
-                document.getElementById('pbal').innerText = userBal.toFixed(2);
-                document.getElementById('pname').innerText = uname;
-                document.getElementById('pav').innerText = uname[0];
-
-                if (currentTab === 'pvp') {
-                    document.getElementById('pool').innerText = d.game.players ? Object.values(d.game.players).reduce((a,b)=>a+b, 0).toFixed(2) : "0.00";
-                    
-                   const bWrap = document.getElementById('bets');
-        bWrap.innerHTML = '';
+       async function sync() {
+    try {
+        const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+        const d = await r.json();
         
-        // Считаем общий пул для расчета процентов
-        const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0) || 0.1;
+        userBal = d.user.bal;
+        document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
+        document.getElementById('pbal').innerText = userBal.toFixed(2);
+        document.getElementById('pname').innerText = uname;
+        document.getElementById('pav').innerText = uname[0];
 
-        d.bets.forEach(b => {
-            const chance = ((b.amount / totalPool) * 100).toFixed(1);
-            const div = document.createElement('div');
-            div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
-            div.innerHTML = `
-                <div class="player-av" style="background: ${stringToColor(b.name)}; color: #fff; font-weight: bold;">
-                    ${b.name[0].toUpperCase()}
-                </div>
-                <div class="player-info">
-                    <span>${b.name}</span>
-                    <small>Ставка: ${b.amount.toFixed(2)} TON</small>
-                </div>
-                <div class="player-chance" style="text-align: right;">
-                    <b style="color: var(--accent);">${chance}%</b><br>
-                    <small style="color: #8e8e93;">ШАНС</small>
-                </div>`;
-            bWrap.appendChild(div);
-        });
-                }
-            } catch(e) {}
+        if (currentTab === 'pvp') {
+            const bWrap = document.getElementById('bets');
+            bWrap.innerHTML = '';
+            
+            const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
+            document.getElementById('pool').innerText = totalPool.toFixed(2);
+
+            d.bets.forEach(b => {
+                const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
+                const div = document.createElement('div');
+                div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
+                div.innerHTML = `
+                    <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
+                    <div class="player-info"><span>${b.name}</span><small>Ставка: ${b.amount.toFixed(2)}</small></div>
+                    <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
+                bWrap.appendChild(div);
+            });
+
+            if (typeof drawCircle === "function") {
+                drawCircle(d.bets, totalPool || 0.1);
+            }
+
+            if (d.game && d.game.timer !== undefined) {
+                const tEl = document.getElementById('timer');
+                if (tEl) tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
+            }
+        }
+    } catch(e) { console.error(e); }
+}
         } function stringToColor(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
     return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
+            function drawCircle(bets, total) {
+    const canvas = document.getElementById('wheelCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 90;
+    const thickness = 18;
+    let startAngle = -Math.PI / 2;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (bets.length === 0) {
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = thickness;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        return;
+    }
+
+    bets.forEach(b => {
+        const sliceAngle = (b.amount / total) * 2 * Math.PI;
+        ctx.strokeStyle = stringToColor(b.name);
+        ctx.lineWidth = thickness;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
+        ctx.stroke();
+        startAngle += sliceAngle;
+    });
+}
 }
 
         setInterval(sync, 2000);
