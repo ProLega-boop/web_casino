@@ -29,10 +29,18 @@
         .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 5px 0 10px; }
         
         #arena {
-            position: relative; width: 100%; height: 250px; border-radius: 20px;
-            border: 1px solid #2c323a; overflow: hidden; background: #111;
-            display: flex; justify-content: center; align-items: center; flex-shrink: 0;
-        }
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1; /* Делаем поле квадратным */
+    height: auto; 
+    border-radius: 15px;
+    border: 1px solid #2c323a;
+    overflow: hidden;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
         .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 15px; border: 1px solid #2c323a; flex-shrink: 0; }
         .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
@@ -86,8 +94,8 @@
 
             <div class="pool-box">POOL: <span id="pool">0.00</span> TON</div>
 
-            <div id="arena">
-                <canvas id="wheelCanvas" width="220" height="220"></canvas>
+           <div id="arena">
+                <canvas id="fieldCanvas" width="350" height="350" style="width: 100%; height: 100%;"></canvas>
                 <div style="position: absolute; text-align: center; pointer-events: none; z-index: 10;">
                     <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase; letter-spacing: 1px;">Удар через</div>
                     <div id="timer" style="font-size: 32px; font-weight: bold; color: #ffcf40;">00:15</div>
@@ -178,51 +186,49 @@
             }
             return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
         }
+let targetPos = { x: 175, y: 175 }; // Позиция прицела
+    let isAnimating = false;
 
-        function drawCircle(bets, total) {
-            const canvas = document.getElementById('wheelCanvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = 90;
-            const thickness = 18;
-            let startAngle = -Math.PI / 2;
+    function drawField(bets, total) {
+        const canvas = document.getElementById('fieldCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const size = canvas.width;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(currentRotation);
-            ctx.translate(-centerX, -centerY);
+        ctx.clearRect(0, 0, size, size);
 
-            if (bets.length === 0) {
-                ctx.strokeStyle = '#222';
-                ctx.lineWidth = thickness;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-                ctx.stroke();
-            } else {
-                bets.forEach(b => {
-                    const sliceAngle = (b.amount / total) * 2 * Math.PI;
-                    ctx.strokeStyle = stringToColor(b.name);
-                    ctx.lineWidth = thickness;
-                    ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, radius, startAngle + 0.05, startAngle + sliceAngle - 0.05);
-                    ctx.stroke();
-                    startAngle += sliceAngle;
-                });
-            }
-            ctx.restore(); 
-
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY - radius - 12);
-            ctx.lineTo(centerX - 8, centerY - radius - 25);
-            ctx.lineTo(centerX + 8, centerY - radius - 25);
-            ctx.closePath();
-            ctx.fill();
+        if (bets.length === 0) {
+            ctx.fillStyle = '#1a1f26';
+            ctx.fillRect(0, 0, size, size);
+        } else {
+            let currentY = 0;
+            bets.forEach(b => {
+                const height = (b.amount / total) * size;
+                ctx.fillStyle = stringToColor(b.name);
+                ctx.fillRect(0, currentY, size, height);
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillText(b.name[0].toUpperCase(), 15, currentY + 25);
+                
+                currentY += height;
+            });
         }
+
+        // Отрисовка прицела
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(targetPos.x, targetPos.y, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Перекрестие в прицеле
+        ctx.moveTo(targetPos.x - 25, targetPos.y);
+        ctx.lineTo(targetPos.x + 25, targetPos.y);
+        ctx.moveTo(targetPos.x, targetPos.y - 25);
+        ctx.lineTo(targetPos.x, targetPos.y + 25);
+        ctx.stroke();
+    }
 
         async function sync() {
             try {
@@ -234,22 +240,20 @@
                 document.getElementById('pbal').innerText = userBal.toFixed(2);
                 document.getElementById('pname').innerText = d.user.name;
 
-                if (d.game) {
-                    document.getElementById('htprize').innerText = `+${(d.game.top_win || 0).toFixed(2)}`;
-                    document.getElementById('hlprize').innerText = `+${(d.game.last_win || 0).toFixed(2)}`;
-                    
-                    const tEl = document.getElementById('timer');
-                    if (d.game.timer <= 0) {
-                        tEl.innerText = "БОЙ!";
-                        tEl.style.color = "#ff4d4d";
-                        currentRotation += 0.15; 
-                    } else {
-                        tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
-                        tEl.style.color = "#ffcf40";
-                        currentRotation = 0;
+        const tEl = document.getElementById('timer');
+                if (d.game.timer <= 0) {
+                    if (!isAnimating) {
+                        targetPos.x = Math.random() * 350;
+                        targetPos.y = Math.random() * 350;
+                        isAnimating = true;
                     }
+                    tEl.innerText = "УДАР!";
+                    tEl.style.color = "#ff4d4d";
+                } else {
+                    isAnimating = false;
+                    tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
+                    tEl.style.color = "#ffcf40";
                 }
-
                 if (currentTab === 'pvp') {
                     const bWrap = document.getElementById('bets');
                     bWrap.innerHTML = '';
@@ -266,7 +270,7 @@
                             <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
                         bWrap.appendChild(div);
                     });
-                    drawCircle(d.bets, totalPool || 0.1);
+                   drawField(d.bets, totalPool || 0.1);
                 }
             } catch(e) { console.error("Sync error:", e); }
         }
