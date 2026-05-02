@@ -133,6 +133,15 @@
         <div id="w-details" style="margin:15px 0; color:#ccc;"></div>
         <div id="w-prize" style="font-size:32px; font-weight:bold; color:var(--green);"></div>
         <button class="btn-main" style="margin-top:20px;" onclick="closeWin()">ПОНЯТНО</button>
+        <div id="win-popup">
+    <div style="font-size: 50px;">☄️</div>
+    <!-- Добавь этот блок для аватарки победителя -->
+    <div id="w-avatar" class="player-av" style="width:70px; height:70px; margin:10px auto; font-size:24px;"></div>
+    <h2 style="margin:10px 0; color:var(--gold);">ПОБЕДА!</h2>
+    <div id="w-name" style="font-size:22px; font-weight:bold;"></div>
+    <div id="w-details" style="margin:15px 0; color:#ccc;"></div>
+    <div id="w-prize" style="font-size:32px; font-weight:bold; color:var(--green);"></div>
+    <button class="btn-main" style="margin-top:20px;" onclick="closeWin()">ПОНЯТНО</button>
     </div>
 
     <script>
@@ -180,59 +189,74 @@
         const canvas = document.getElementById('fieldCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Рисует маленькую аватарку внутри сектора на поле
+function drawFieldAvatar(x, y, name) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.fillStyle = '#222';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name[0].toUpperCase(), x, y);
+    ctx.restore();
+}
+        
         function mainLoop() {
-            ctx.clearRect(0, 0, 800, 800);
+    ctx.clearRect(0, 0, 800, 800);
+    
+    if (state.bets.length > 0) {
+        let startAngle = -Math.PI / 2;
+        state.bets.forEach(b => {
+            const slice = (b.amount / state.total) * (Math.PI * 2);
+            ctx.beginPath();
+            ctx.moveTo(400, 400);
             
-            // Отрисовка секторов
-            if (state.bets.length > 0) {
-                let startAngle = -Math.PI / 2;
-                state.bets.forEach(b => {
-                    const slice = (b.amount / state.total) * (Math.PI * 2);
-                    ctx.beginPath();
-                    ctx.moveTo(400, 400);
-                    
-                    // Рисуем по границе квадрата
-                    for (let a = startAngle; a <= startAngle + slice + 0.02; a += 0.05) {
-                        const p = getSquarePoint(a, 400);
-                        ctx.lineTo(p.x, p.y);
-                    }
-                    
-                    ctx.fillStyle = stringToColor(b.name);
-                    ctx.fill();
-
-                    // Если этот игрок победил, запоминаем его координаты для прицела
-                    if (state.winner && (b.uid == state.winner.uid)) {
-                        const midAngle = startAngle + slice / 2;
-                        const p = getSquarePoint(midAngle, 250);
-                        targetPos = p;
-                    }
-                    startAngle += slice;
-                });
-            } else {
-                ctx.fillStyle = '#111';
-                ctx.fillRect(0,0,800,800);
+            for (let a = startAngle; a <= startAngle + slice + 0.01; a += 0.02) {
+                const p = getSquarePoint(a, 400);
+                ctx.lineTo(p.x, p.y);
             }
+            
+            ctx.fillStyle = stringToColor(b.name);
+            ctx.fill();
+            
+            // Черная обводка между секторами (устраняет разрывы)
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.stroke();
 
-            // 4. Плавное движение прицела (Lerp)
-            // Плавность: чем меньше 0.05, тем медленнее скользит
-            currentPos.x += (targetPos.x - currentPos.x) * 0.05;
-            currentPos.y += (targetPos.y - currentPos.y) * 0.05;
+            // Рисуем аватарку в центре сектора
+            const midAngle = startAngle + slice / 2;
+            const avPos = getSquarePoint(midAngle, 220); // 220 - расстояние от центра
+            drawFieldAvatar(avPos.x, avPos.y, b.name);
 
-            // Рисуем прицел
-            drawCrosshair(currentPos.x, currentPos.y);
-
-            // 5. Метеорит
-            if (meteorite.active) {
-                drawMeteorite();
+            if (state.winner && (b.uid == state.winner.uid)) {
+                targetPos = getSquarePoint(midAngle, 250);
             }
+            startAngle += slice;
+        });
+    } else {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0,0,800,800);
+    }
 
-            // Взрыв
-            if (meteorite.explosion > 0) {
-                drawExplosion();
-            }
+    // Плавное скольжение прицела (Lerp)
+    currentPos.x += (targetPos.x - currentPos.x) * 0.05;
+    currentPos.y += (targetPos.y - currentPos.y) * 0.05;
 
-            requestAnimationFrame(mainLoop);
-        }
+    drawCrosshair(currentPos.x, currentPos.y);
+
+    if (meteorite.active) drawMeteorite();
+    if (meteorite.explosion > 0) drawExplosion();
+
+    requestAnimationFrame(mainLoop);
+}
 
         function drawCrosshair(x, y) {
             ctx.save();
@@ -376,14 +400,24 @@ async function doBet() {
     } catch (e) { console.error(e); }
 }
 
-        function showWinPopup() {
-            if (!state.winner) return;
-            document.getElementById('w-name').innerText = state.winner.name;
-            const chance = ((state.winner.amount / state.total) * 100).toFixed(1);
-            document.getElementById('w-details').innerText = `Ставка: ${state.winner.amount.toFixed(2)} TON • Шанс: ${chance}%`;
-            document.getElementById('w-prize').innerText = `+${(state.total * 0.95).toFixed(2)} TON`;
-            document.getElementById('win-popup').style.display = 'block';
-        }
+       function showWinPopup() {
+    if (!state.winner) return;
+    
+    const winName = state.winner.name;
+    const chance = ((state.winner.amount / state.total) * 100).toFixed(1);
+    const prize = (state.total * 0.95).toFixed(2);
+
+    // Заполнение данных в окне
+    const avEl = document.getElementById('w-avatar');
+    avEl.innerText = winName[0].toUpperCase();
+    avEl.style.background = stringToColor(winName);
+    
+    document.getElementById('w-name').innerText = winName;
+    document.getElementById('w-details').innerText = `Шанс: ${chance}% • Ставка: ${state.winner.amount.toFixed(2)} TON`;
+    document.getElementById('w-prize').innerText = `+${prize} TON`;
+    
+    document.getElementById('win-popup').style.display = 'block';
+}
 
         function closeWin() { document.getElementById('win-popup').style.display = 'none'; }
         function setBet(v) { document.getElementById('bet-input').value = v; }
