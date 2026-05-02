@@ -287,67 +287,94 @@
             if (meteorite.explosion > 40) meteorite.explosion = 0;
             ctx.restore();
         }
+        
+// Функция отправки ставки на сервер
+async function doBet() {
+    const amount = parseFloat(document.getElementById('bet-input').value);
+    if (isNaN(amount) || amount <= 0) return alert("Введите корректную сумму");
 
-        async function sync() {
-            try {
-                const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
-                const d = await r.json();
-                
-                state.bets = d.bets;
-                state.total = d.bets.reduce((a, b) => a + b.amount, 0);
-                state.timer = d.game.timer;
-                
-                // 7. Обновление истории
-                if (d.history) {
-                    document.getElementById('htprize').innerText = '+' + d.history.top.toFixed(2);
-                    document.getElementById('hlprize').innerText = '+' + d.history.last.toFixed(2);
-                }
+    try {
+        const response = await fetch('/api/place_bet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid, amount, name: uname })
+        });
+        const result = await response.json();
+        if (result.error) alert(result.error);
+        else sync(); // Сразу обновляем состояние после ставки
+    } catch (e) {
+        console.error("Ошибка ставки:", e);
+    }
+}
+        
+      async function sync() {
+    try {
+        const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
+        const d = await r.json();
+        
+        state.bets = d.bets;
+        state.total = d.bets.reduce((a, b) => a + b.amount, 0);
+        state.timer = d.game.timer;
 
-                document.getElementById('pvp-bal').innerText = d.user.bal.toFixed(2);
-                document.getElementById('pool').innerText = state.total.toFixed(2);
-                
-                const tEl = document.getElementById('timer');
-                if (state.timer <= 0) {
-                    tEl.innerText = "УДАР!";
-                    tEl.style.color = "#ff3b30";
-                    if (!isAnimatingWinner && d.game.winner) {
-                        state.winner = d.game.winner;
-                        isAnimatingWinner = true;
-                        // Запуск метеорита
-                        meteorite.active = true;
-                        meteorite.y = -100;
-                        meteorite.x = currentPos.x;
-                    }
-                } else {
-                    tEl.innerText = `00:${state.timer < 10 ? '0' : ''}${state.timer}`;
-                    tEl.style.color = "#ffcf40";
-                    isAnimatingWinner = false;
-                    state.winner = null;
-                    // В режиме ожидания прицел медленно дрейфует
-                    if (state.timer > 2) {
-                        targetPos = { 
-                            x: 400 + Math.cos(Date.now()/1000) * 100, 
-                            y: 400 + Math.sin(Date.now()/1000) * 100 
-                        };
-                    }
-                }
-
-                // Рендер списка игроков
-                const list = document.getElementById('bets-list');
-                list.innerHTML = '';
-                d.bets.forEach(b => {
-                    const chance = ((b.amount / state.total) * 100).toFixed(1);
-                    list.innerHTML += `
-                        <div class="player-row" style="border: 1px solid ${b.uid == uid ? 'var(--accent)' : 'transparent'}">
-                            <div class="player-av" style="background:${stringToColor(b.name)}">${b.name[0]}</div>
-                            <div><b>${b.name}</b><br><small>${b.amount.toFixed(2)} TON</small></div>
-                            <div style="text-align:right"><b>${chance}%</b></div>
-                        </div>
-                    `;
-                });
-
-            } catch (e) { console.error(e); }
+        // --- ОБНОВЛЕНИЕ ПРОФИЛЯ (Решение задачи №3) ---
+        if (d.user) {
+            document.getElementById('pvp-bal').innerText = d.user.bal.toFixed(2);
+            document.getElementById('pbal').innerText = d.user.bal.toFixed(2);
+            document.getElementById('pname').innerText = d.user.username || uname;
+            const avatar = document.getElementById('pav');
+            avatar.innerText = (d.user.username || uname)[0].toUpperCase();
+            avatar.style.background = stringToColor(d.user.username || uname);
         }
+
+        // --- ЛОГИКА ТАЙМЕРА (Решение задачи №2) ---[cite: 4]
+        const tEl = document.getElementById('timer');
+        const tLabel = tEl.previousElementSibling; // Текст "Удар через"
+
+        if (state.bets.length < 2) {
+            tLabel.innerText = "ОЖИДАНИЕ ИГРОКОВ";
+            tEl.innerText = `${state.bets.length}/2`;
+            tEl.style.color = "#aaa";
+        } else {
+            tLabel.innerText = "УДАР ЧЕРЕЗ";
+            if (state.timer <= 0) {
+                tEl.innerText = "УДАР!";
+                tEl.style.color = "#ff3b30";
+                if (!isAnimatingWinner && d.game.winner) {
+                    state.winner = d.game.winner;
+                    isAnimatingWinner = true;
+                    meteorite.active = true;
+                    meteorite.y = -100;
+                    meteorite.x = currentPos.x;
+                }
+            } else {
+                tEl.innerText = `00:${state.timer < 10 ? '0' : ''}${state.timer}`;
+                tEl.style.color = "#ffcf40";
+                isAnimatingWinner = false;
+                state.winner = null;
+            }
+        }
+
+        // История и список игроков (оставляем как было)[cite: 4]
+        if (d.history) {
+            document.getElementById('htprize').innerText = '+' + d.history.top.toFixed(2);
+            document.getElementById('hlprize').innerText = '+' + d.history.last.toFixed(2);
+        }
+        document.getElementById('pool').innerText = state.total.toFixed(2);
+
+        const list = document.getElementById('bets-list');
+        list.innerHTML = '';
+        d.bets.forEach(b => {
+            const chance = ((b.amount / state.total) * 100).toFixed(1);
+            list.innerHTML += `
+                <div class="player-row" style="border: 1px solid ${b.uid == uid ? 'var(--accent)' : 'transparent'}">
+                    <div class="player-av" style="background:${stringToColor(b.name)}">${b.name[0]}</div>
+                    <div><b>${b.name}</b><br><small>${b.amount.toFixed(2)} TON</small></div>
+                    <div style="text-align:right"><b>${chance}%</b></div>
+                </div>
+            `;
+        });
+    } catch (e) { console.error(e); }
+}
 
         function showWinPopup() {
             if (!state.winner) return;
