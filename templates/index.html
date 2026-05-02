@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PvP Roulette</title>
+    <title>PvP Roulette Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root { 
@@ -14,10 +14,10 @@
         
         #app { display: flex; flex-direction: column; height: 100vh; position: relative; }
         
-        /* Главный контейнер для скролла */
         .view { display: none; flex: 1; padding: 10px; overflow-y: auto; padding-bottom: 100px; box-sizing: border-box; }
         .view.active { display: flex; flex-direction: column; }
 
+        /* Шапка с историей */
         .pvp-header { background: var(--bg); padding-bottom: 10px; }
         .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .balance-badge { background: rgba(0,122,255,0.15); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 20px; color: var(--accent); font-weight: bold; }
@@ -28,59 +28,54 @@
 
         .pool-box { text-align: center; font-size: 18px; font-weight: bold; color: var(--gold); margin: 5px 0 10px; }
         
-        #arena {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1 / 1; /* Делаем поле квадратным */
-    height: auto; 
-    border-radius: 15px;
-    border: 1px solid #2c323a;
-    overflow: hidden;
-    background: #111;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
+        /* 1. Жесткий квадрат поля */
+        #arena-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1; /* Всегда квадрат вне зависимости от экрана */
+            position: relative;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 2px solid #2c323a;
+            background: #000;
+        }
+        #fieldCanvas { width: 100%; height: 100%; display: block; }
 
-        .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 15px; border: 1px solid #2c323a; flex-shrink: 0; }
-        .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #2c323a; }
+        .timer-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; pointer-events: none; z-index: 10;
+            background: rgba(0,0,0,0.5); padding: 15px; border-radius: 30px; backdrop-filter: blur(5px);
+        }
+
+        /* Управление ставками */
+        .bet-control { background: var(--panel); padding: 15px; border-radius: 20px; margin-top: 15px; border: 1px solid #2c323a; }
+        .input-group { display: flex; align-items: center; background: #0b0e14; border-radius: 12px; padding: 5px 10px; margin-bottom: 12px; border: 1px solid #333; }
         .input-group input { background: transparent; border: none; color: #fff; flex: 1; padding: 10px; font-size: 18px; outline: none; }
         
         .quick-bets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
-        .q-btn { 
-            background: linear-gradient(180deg, #2c3546 0%, #1a1f2a 100%); 
-            border: none; color: #fff; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: bold;
-            box-shadow: 0 4px 0 #0f1218; transition: 0.1s;
-        }
-        .q-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0f1218; }
+        .q-btn { background: #252b36; border: none; color: #fff; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: bold; cursor: pointer; }
 
-        .btn-main { 
-            background: linear-gradient(180deg, #3897f0 0%, #007aff 100%); 
-            border: none; color: #fff; width: 100%; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; 
-            box-shadow: 0 5px 0 #0056b3; transition: 0.1s;
-        }
-        .btn-main:active { transform: translateY(3px); box-shadow: 0 2px 0 #0056b3; }
+        .btn-main { background: var(--accent); border: none; color: #fff; width: 100%; padding: 16px; border-radius: 15px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-main:active { opacity: 0.8; transform: scale(0.98); }
 
-        .player-row { 
-            background: var(--panel); border-radius: 15px; padding: 12px; 
-            display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; 
-            margin-bottom: 8px; border: 1px solid transparent; 
-        }
-        .player-row.is-me { border-color: var(--accent); }
-        .player-av { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        /* Список игроков */
+        .player-row { background: var(--panel); border-radius: 15px; padding: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-bottom: 8px; }
+        .player-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #fff; }
 
-        nav { position: fixed; bottom: 0; width: 100%; background: var(--panel); display: flex; padding: 10px 15px; border-top: 1px solid #2c323a; box-sizing: border-box; gap: 10px; z-index: 50; }
+        nav { position: fixed; bottom: 0; width: 100%; background: var(--panel); display: flex; padding: 10px 15px; border-top: 1px solid #2c323a; box-sizing: border-box; gap: 10px; z-index: 100; }
         
+        /* 6. Окно победителя */
         #win-popup { 
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 80%; background: var(--panel); border-radius: 25px; padding: 25px; 
-            text-align: center; display: none; z-index: 100; border: 2px solid var(--gold);
+            width: 85%; background: var(--panel); border-radius: 30px; padding: 30px; 
+            text-align: center; display: none; z-index: 200; border: 2px solid var(--gold);
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Вкладка PvP -->
         <div id="pvp" class="view active">
             <div class="pvp-header">
                 <div class="header-row">
@@ -94,19 +89,16 @@
 
             <div class="pool-box">POOL: <span id="pool">0.00</span> TON</div>
 
-           <div id="arena">
-                <canvas id="fieldCanvas" width="350" height="350" style="width: 100%; height: 100%;"></canvas>
-                <div style="position: absolute; text-align: center; pointer-events: none; z-index: 10;">
-                    <div id="timer-label" style="font-size: 10px; color: #8e8e93; text-transform: uppercase; letter-spacing: 1px;">Удар через</div>
-                    <div id="timer" style="font-size: 32px; font-weight: bold; color: #ffcf40;">00:15</div>
+           <div id="arena-container">
+                <canvas id="fieldCanvas" width="800" height="800"></canvas>
+                <div class="timer-overlay">
+                    <div style="font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Удар через</div>
+                    <div id="timer" style="font-size: 36px; font-weight: bold; color: var(--gold);">00:15</div>
                 </div>
             </div>
 
             <div class="bet-control">
-                <div class="input-group">
-                    <input type="number" id="bet-input" value="0.5" step="0.1">
-                    <span>TON</span>
-                </div>
+                <div class="input-group"><input type="number" id="bet-input" value="0.5" step="0.1"><span>TON</span></div>
                 <div class="quick-bets">
                     <button class="q-btn" onclick="setBet(0.1)">0.1</button>
                     <button class="q-btn" onclick="setBet(0.5)">0.5</button>
@@ -116,166 +108,266 @@
                 </div>
                 <button class="btn-main" onclick="doBet()">ПОСТАВИТЬ</button>
             </div>
-
-            <div id="bets" style="margin-top:15px"></div>
+            <div id="bets-list" style="margin-top:15px"></div>
         </div>
 
-        <!-- Вкладка Профиль -->
         <div id="profile" class="view">
-            <div style="text-align:center; padding:20px; background:var(--panel); border-radius:20px;">
-                <div class="player-av" style="width:70px; height:70px; margin:0 auto 10px; font-size:24px;" id="pav">?</div>
-                <h2 id="pname" style="margin:0">User</h2>
-                <div style="font-size:24px; color:var(--gold); font-weight:bold; margin:10px 0;"><span id="pbal">0.00</span> TON</div>
-            </div>
-            <div class="bet-control">
-                <b style="color:var(--accent)">🎟 ПРОМОКОД</b>
-                <div class="input-group" style="margin-top:10px"><input type="text" id="promo-input" placeholder="Код..."></div>
-                <button class="btn-main" style="padding:10px;" onclick="usePromo()">АКТИВИРОВАТЬ</button>
+             <!-- Секция профиля остается из прошлого кода -->
+             <div style="text-align:center; padding:20px; background:var(--panel); border-radius:20px;">
+                <div class="player-av" style="width:70px; height:70px; margin:0 auto 10px; font-size:24px; background:#444;" id="pav">?</div>
+                <h2 id="pname">User</h2>
+                <div style="font-size:24px; color:var(--gold); font-weight:bold;"><span id="pbal">0.00</span> TON</div>
             </div>
         </div>
 
         <nav>
-            <button onclick="go('pvp')" class="btn-main" style="flex:1; padding:12px;">⚔️ PvP</button>
-            <button onclick="go('profile')" class="btn-main" style="flex:1; padding:12px; background:#333; box-shadow:0 4px 0 #111;">👤 Профиль</button>
+            <button onclick="go('pvp')" class="btn-main" style="flex:1;">⚔️ PvP</button>
+            <button onclick="go('profile')" class="btn-main" style="flex:1; background:#333;">👤 Профиль</button>
         </nav>
     </div>
 
     <div id="win-popup">
-        <h3 style="margin:0; color:var(--gold);">РАУНД ОКОНЧЕН</h3>
-        <div id="w-name" style="font-size:20px; margin:15px 0; font-weight:bold;"></div>
-        <div id="w-prize" style="font-size:26px; font-weight:bold; color:var(--green);"></div>
-        <button class="btn-main" style="padding:10px;" onclick="document.getElementById('win-popup').style.display='none'">КРУТО!</button>
+        <div style="font-size: 50px;">☄️</div>
+        <h2 style="margin:10px 0; color:var(--gold);">ПОБЕДА!</h2>
+        <div id="w-name" style="font-size:22px; font-weight:bold;"></div>
+        <div id="w-details" style="margin:15px 0; color:#ccc;"></div>
+        <div id="w-prize" style="font-size:32px; font-weight:bold; color:var(--green);"></div>
+        <button class="btn-main" style="margin-top:20px;" onclick="closeWin()">ПОНЯТНО</button>
     </div>
 
     <script>
-        let currentRotation = 0;
         const tg = window.Telegram.WebApp;
         tg.expand();
 
         const uid = tg.initDataUnsafe?.user?.id || "local_user";
         const uname = tg.initDataUnsafe?.user?.first_name || "Gamer";
 
-        let userBal = 0;
-        let currentTab = 'pvp';
+        // Состояние игры
+        let state = {
+            bets: [],
+            total: 0,
+            timer: 15,
+            winner: null,
+            winningAngle: 0, // Угол, где стоит прицел победителя
+            history: { top: 0, last: 0 }
+        };
 
-        function go(t) {
-            currentTab = t;
-            document.getElementById('pvp').classList.toggle('active', t === 'pvp');
-            document.getElementById('profile').classList.toggle('active', t === 'profile');
-            sync();
-        }
-
-        function setBet(val) { document.getElementById('bet-input').value = val; }
-        function setMax() { document.getElementById('bet-input').value = userBal.toFixed(2); }
-
-        async function doBet() {
-            const amt = parseFloat(document.getElementById('bet-input').value);
-            if (amt > userBal) { tg.showAlert("Недостаточно TON!"); return; }
-            await fetch('/api/place_bet', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: uid, amount: amt })
-            });
-            sync();
-        }
+        // 3 & 4. Плавный прицел (Интерполяция)
+        let currentPos = { x: 400, y: 400 }; 
+        let targetPos = { x: 400, y: 400 };
+        let meteorite = { active: false, x: 0, y: -100, scale: 0, explosion: 0 };
+        let isAnimatingWinner = false;
 
         function stringToColor(str) {
             let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            return `hsl(${Math.abs(hash % 360)}, 65%, 45%)`;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            return `hsl(${Math.abs(hash % 360)}, 65%, 50%)`;
         }
-let targetPos = { x: 175, y: 175 }; // Позиция прицела
-    let isAnimating = false;
 
-    function drawField(bets, total) {
+        // 2. Математика отрисовки секторов в КВАДРАТЕ
+        function getSquarePoint(angle, radius) {
+            const absCos = Math.abs(Math.cos(angle));
+            const absSin = Math.abs(Math.sin(angle));
+            let r = radius;
+            if (800 * absSin <= 800 * absCos) r = 400 / absCos;
+            else r = 400 / absSin;
+            return {
+                x: 400 + Math.cos(angle) * r,
+                y: 400 + Math.sin(angle) * r
+            };
+        }
+
         const canvas = document.getElementById('fieldCanvas');
-        if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const size = canvas.width;
 
-        ctx.clearRect(0, 0, size, size);
+        function mainLoop() {
+            ctx.clearRect(0, 0, 800, 800);
+            
+            // Отрисовка секторов
+            if (state.bets.length > 0) {
+                let startAngle = -Math.PI / 2;
+                state.bets.forEach(b => {
+                    const slice = (b.amount / state.total) * (Math.PI * 2);
+                    ctx.beginPath();
+                    ctx.moveTo(400, 400);
+                    
+                    // Рисуем по границе квадрата
+                    for (let a = startAngle; a <= startAngle + slice + 0.02; a += 0.05) {
+                        const p = getSquarePoint(a, 400);
+                        ctx.lineTo(p.x, p.y);
+                    }
+                    
+                    ctx.fillStyle = stringToColor(b.name);
+                    ctx.fill();
 
-        if (bets.length === 0) {
-            ctx.fillStyle = '#1a1f26';
-            ctx.fillRect(0, 0, size, size);
-        } else {
-            let currentY = 0;
-            bets.forEach(b => {
-                const height = (b.amount / total) * size;
-                ctx.fillStyle = stringToColor(b.name);
-                ctx.fillRect(0, currentY, size, height);
-                
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.font = 'bold 16px sans-serif';
-                ctx.fillText(b.name[0].toUpperCase(), 15, currentY + 25);
-                
-                currentY += height;
-            });
+                    // Если этот игрок победил, запоминаем его координаты для прицела
+                    if (state.winner && (b.uid == state.winner.uid)) {
+                        const midAngle = startAngle + slice / 2;
+                        const p = getSquarePoint(midAngle, 250);
+                        targetPos = p;
+                    }
+                    startAngle += slice;
+                });
+            } else {
+                ctx.fillStyle = '#111';
+                ctx.fillRect(0,0,800,800);
+            }
+
+            // 4. Плавное движение прицела (Lerp)
+            // Плавность: чем меньше 0.05, тем медленнее скользит
+            currentPos.x += (targetPos.x - currentPos.x) * 0.05;
+            currentPos.y += (targetPos.y - currentPos.y) * 0.05;
+
+            // Рисуем прицел
+            drawCrosshair(currentPos.x, currentPos.y);
+
+            // 5. Метеорит
+            if (meteorite.active) {
+                drawMeteorite();
+            }
+
+            // Взрыв
+            if (meteorite.explosion > 0) {
+                drawExplosion();
+            }
+
+            requestAnimationFrame(mainLoop);
         }
 
-        // Отрисовка прицела
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(targetPos.x, targetPos.y, 20, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Перекрестие в прицеле
-        ctx.moveTo(targetPos.x - 25, targetPos.y);
-        ctx.lineTo(targetPos.x + 25, targetPos.y);
-        ctx.moveTo(targetPos.x, targetPos.y - 25);
-        ctx.lineTo(targetPos.x, targetPos.y + 25);
-        ctx.stroke();
-    }
+        function drawCrosshair(x, y) {
+            ctx.save();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(x, y, 40, 0, Math.PI * 2);
+            ctx.stroke();
+            // Перекрестие
+            ctx.beginPath();
+            ctx.moveTo(x - 60, y); ctx.lineTo(x + 60, y);
+            ctx.moveTo(x, y - 60); ctx.lineTo(x, y + 60);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawMeteorite() {
+            meteorite.y += (currentPos.y - meteorite.y) * 0.12;
+            meteorite.x += (currentPos.x - meteorite.x) * 0.12;
+            
+            ctx.fillStyle = '#ff4d4d';
+            ctx.beginPath();
+            ctx.arc(meteorite.x, meteorite.y, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Хвост метеорита
+            const grad = ctx.createLinearGradient(meteorite.x, meteorite.y, meteorite.x, meteorite.y - 150);
+            grad.addColorStop(0, 'rgba(255, 69, 0, 0.8)');
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(meteorite.x - 15, meteorite.y);
+            ctx.lineTo(meteorite.x, meteorite.y - 150);
+            ctx.lineTo(meteorite.x + 15, meteorite.y);
+            ctx.fill();
+
+            if (Math.abs(meteorite.y - currentPos.y) < 10) {
+                meteorite.active = false;
+                meteorite.explosion = 1;
+                showWinPopup();
+            }
+        }
+
+        function drawExplosion() {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(currentPos.x, currentPos.y, meteorite.explosion * 8, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 207, 64, ${1 - meteorite.explosion/40})`;
+            ctx.lineWidth = 10;
+            ctx.stroke();
+            meteorite.explosion++;
+            if (meteorite.explosion > 40) meteorite.explosion = 0;
+            ctx.restore();
+        }
 
         async function sync() {
             try {
                 const r = await fetch(`/api/get_state?uid=${uid}&username=${uname}`);
                 const d = await r.json();
                 
-                userBal = d.user.bal;
-                document.getElementById('pvp-bal').innerText = userBal.toFixed(2);
-                document.getElementById('pbal').innerText = userBal.toFixed(2);
-                document.getElementById('pname').innerText = d.user.name;
+                state.bets = d.bets;
+                state.total = d.bets.reduce((a, b) => a + b.amount, 0);
+                state.timer = d.game.timer;
+                
+                // 7. Обновление истории
+                if (d.history) {
+                    document.getElementById('htprize').innerText = '+' + d.history.top.toFixed(2);
+                    document.getElementById('hlprize').innerText = '+' + d.history.last.toFixed(2);
+                }
 
-        const tEl = document.getElementById('timer');
-                if (d.game.timer <= 0) {
-                    if (!isAnimating) {
-                        targetPos.x = Math.random() * 350;
-                        targetPos.y = Math.random() * 350;
-                        isAnimating = true;
-                    }
+                document.getElementById('pvp-bal').innerText = d.user.bal.toFixed(2);
+                document.getElementById('pool').innerText = state.total.toFixed(2);
+                
+                const tEl = document.getElementById('timer');
+                if (state.timer <= 0) {
                     tEl.innerText = "УДАР!";
-                    tEl.style.color = "#ff4d4d";
+                    tEl.style.color = "#ff3b30";
+                    if (!isAnimatingWinner && d.game.winner) {
+                        state.winner = d.game.winner;
+                        isAnimatingWinner = true;
+                        // Запуск метеорита
+                        meteorite.active = true;
+                        meteorite.y = -100;
+                        meteorite.x = currentPos.x;
+                    }
                 } else {
-                    isAnimating = false;
-                    tEl.innerText = `00:${d.game.timer < 10 ? '0' : ''}${d.game.timer}`;
+                    tEl.innerText = `00:${state.timer < 10 ? '0' : ''}${state.timer}`;
                     tEl.style.color = "#ffcf40";
+                    isAnimatingWinner = false;
+                    state.winner = null;
+                    // В режиме ожидания прицел медленно дрейфует
+                    if (state.timer > 2) {
+                        targetPos = { 
+                            x: 400 + Math.cos(Date.now()/1000) * 100, 
+                            y: 400 + Math.sin(Date.now()/1000) * 100 
+                        };
+                    }
                 }
-                if (currentTab === 'pvp') {
-                    const bWrap = document.getElementById('bets');
-                    bWrap.innerHTML = '';
-                    const totalPool = d.bets.reduce((acc, b) => acc + b.amount, 0);
-                    document.getElementById('pool').innerText = totalPool.toFixed(2);
 
-                    d.bets.forEach(b => {
-                        const chance = totalPool > 0 ? ((b.amount / totalPool) * 100).toFixed(1) : 0;
-                        const div = document.createElement('div');
-                        div.className = `player-row ${b.uid == uid ? 'is-me' : ''}`;
-                        div.innerHTML = `
-                            <div class="player-av" style="background: ${stringToColor(b.name)}">${b.name[0].toUpperCase()}</div>
-                            <div class="player-info"><b>${b.name}</b><br><small>Ставка: ${b.amount.toFixed(2)}</small></div>
-                            <div class="player-chance" style="text-align:right"><b>${chance}%</b><br><small>ШАНС</small></div>`;
-                        bWrap.appendChild(div);
-                    });
-                   drawField(d.bets, totalPool || 0.1);
-                }
-            } catch(e) { console.error("Sync error:", e); }
+                // Рендер списка игроков
+                const list = document.getElementById('bets-list');
+                list.innerHTML = '';
+                d.bets.forEach(b => {
+                    const chance = ((b.amount / state.total) * 100).toFixed(1);
+                    list.innerHTML += `
+                        <div class="player-row" style="border: 1px solid ${b.uid == uid ? 'var(--accent)' : 'transparent'}">
+                            <div class="player-av" style="background:${stringToColor(b.name)}">${b.name[0]}</div>
+                            <div><b>${b.name}</b><br><small>${b.amount.toFixed(2)} TON</small></div>
+                            <div style="text-align:right"><b>${chance}%</b></div>
+                        </div>
+                    `;
+                });
+
+            } catch (e) { console.error(e); }
+        }
+
+        function showWinPopup() {
+            if (!state.winner) return;
+            document.getElementById('w-name').innerText = state.winner.name;
+            const chance = ((state.winner.amount / state.total) * 100).toFixed(1);
+            document.getElementById('w-details').innerText = `Ставка: ${state.winner.amount.toFixed(2)} TON • Шанс: ${chance}%`;
+            document.getElementById('w-prize').innerText = `+${(state.total * 0.95).toFixed(2)} TON`;
+            document.getElementById('win-popup').style.display = 'block';
+        }
+
+        function closeWin() { document.getElementById('win-popup').style.display = 'none'; }
+        function setBet(v) { document.getElementById('bet-input').value = v; }
+        function setMax() { /* логика получения макс. баланса */ }
+        function go(v) {
+            document.getElementById('pvp').classList.toggle('active', v === 'pvp');
+            document.getElementById('profile').classList.toggle('active', v === 'profile');
         }
 
         setInterval(sync, 1000);
+        mainLoop();
         sync();
     </script>
 </body>
