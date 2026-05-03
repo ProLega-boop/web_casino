@@ -30,16 +30,18 @@
         
         /* 1. Жесткий квадрат поля */
         #arena-container {
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-            aspect-ratio: 1 / 1; /* Всегда квадрат вне зависимости от экрана */
-            position: relative;
-            border-radius: 24px;
-            overflow: hidden;
-            border: 2px solid #2c323a;
-            background: #000;
-        }
+    width: 95vw; /* Занимает почти всю ширину экрана */
+    height: 95vw; /* Высота равна ширине для идеального квадрата */
+    max-width: 380px; /* Ограничение для больших экранов */
+    max-height: 380px;
+    margin: 10px auto;
+    flex-shrink: 0; /* ЗАПРЕЩАЕТ сжатие поля */
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #000;
+    border: 4px solid #2c323a;
+}
         #fieldCanvas { width: 100%; height: 100%; display: block; }
 
         .timer-overlay {
@@ -126,6 +128,34 @@
         </nav>
     </div>
 
+    // Новые переменные для физики шайбы
+let puck = {
+    x: 400, y: 400,
+    vx: 5, vy: 3, // Скорость по X и Y
+    radius: 40
+};
+
+function updatePuckPhysics() {
+    if (state.timer > 0) { // Пока идет таймер — шайба летает
+        puck.x += puck.vx;
+        puck.y += puck.vy;
+
+        // Отскок от левой и правой грани
+        if (puck.x + puck.radius > 800 || puck.x - puck.radius < 0) {
+            puck.vx *= -1;
+        }
+        // Отскок от верхней и нижней грани
+        if (puck.y + puck.radius > 800 || puck.y - puck.radius < 0) {
+            puck.vy *= -1;
+        }
+        targetPos = { x: puck.x, y: puck.y };
+    } else {
+        // Когда таймер 0, прицел плавно идет к победному сектору (твой старый Lerp)
+        currentPos.x += (targetPos.x - currentPos.x) * 0.05;
+        currentPos.y += (targetPos.y - currentPos.y) * 0.05;
+    }
+}
+            
     <div id="win-popup">
         <div style="font-size: 50px;">☄️</div>
         <h2 style="margin:10px 0; color:var(--gold);">ПОБЕДА!</h2>
@@ -225,6 +255,9 @@ function drawFieldAvatar(x, y, name) {
             
             ctx.fillStyle = stringToColor(b.name);
             ctx.fill();
+            ctx.strokeStyle = color; // Цвет обводки такой же, как у сектора
+ctx.lineWidth = 2;       // Минимальная толщина, чтобы закрыть щель
+ctx.stroke();            // Рисуем контур, который перекроет дырку
             
             // Черная обводка между секторами (устраняет разрывы)
             ctx.strokeStyle = '#000';
@@ -379,19 +412,33 @@ async function doBet() {
         }
 
         // История и список игроков (оставляем как было)[cite: 4]
-        if (d.history) {
-            document.getElementById('htprize').innerText = '+' + d.history.top.toFixed(2);
-            document.getElementById('hlprize').innerText = '+' + d.history.last.toFixed(2);
-        }
+       if (d.history) {
+    // Используем значения напрямую из ответа сервера
+    const topVal = parseFloat(d.history.top) || 0;
+    const lastVal = parseFloat(d.history.last) || 0;
+    
+    document.getElementById('htprize').innerText = '+' + topVal.toFixed(2);
+    document.getElementById('hlprize').innerText = '+' + lastVal.toFixed(2);
+}
         document.getElementById('pool').innerText = state.total.toFixed(2);
 
+       // Обновление списка ставок (игроков)
         const list = document.getElementById('bets-list');
         list.innerHTML = '';
+        
         d.bets.forEach(b => {
             const chance = ((b.amount / state.total) * 100).toFixed(1);
+            
+            // ПРОВЕРКА АВАТАРКИ: если b.photo_url есть, ставим <img>, иначе цветную заглушку
+            const avatarContent = b.photo_url 
+                ? `<img src="${b.photo_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`
+                : b.name[0].toUpperCase();
+
             list.innerHTML += `
                 <div class="player-row" style="border: 1px solid ${b.uid == uid ? 'var(--accent)' : 'transparent'}">
-                    <div class="player-av" style="background:${stringToColor(b.name)}">${b.name[0]}</div>
+                    <div class="player-av" style="background:${b.photo_url ? 'transparent' : stringToColor(b.name)}">
+                        ${avatarContent}
+                    </div>
                     <div><b>${b.name}</b><br><small>${b.amount.toFixed(2)} TON</small></div>
                     <div style="text-align:right"><b>${chance}%</b></div>
                 </div>
